@@ -1,0 +1,121 @@
+# P5.5 1-hour soak — DEBUG kernel, turbo off. RESULT: AP clean; MODEM dmesg gate FAIL (soft lockup 22 s in iperf3, stack in KASAN/kmemleak stack-trace saving, no mlink frames) — under investigation, P5.5 NOT ticked
+# command (laptop, tmux): bash ~/D/mlink/scripts/host/soak-long.sh 3600
+=== long soak start 2026-10-27T03:49:33+05:30 dur=3600s temp=45C
+03:51:44 chaos burst 1 done
+03:54:07 modem restart 1 done
+03:56:58 chaos burst 2 done
+03:59:10 modem restart 2 done
+04:02:11 chaos burst 3 done
+04:04:13 modem restart 3 done
+04:07:24 chaos burst 4 done
+04:09:16 modem restart 4 done
+04:12:37 chaos burst 5 done
+04:14:21 modem restart 5 done
+04:17:47 chaos burst 6 done
+04:19:25 modem restart 6 done
+04:23:00 chaos burst 7 done
+04:24:29 modem restart 7 done
+04:28:14 chaos burst 8 done
+04:29:33 modem restart 8 done
+04:33:28 chaos burst 9 done
+04:34:36 modem restart 9 done
+04:38:41 chaos burst 10 done
+04:39:39 modem restart 10 done
+04:43:54 chaos burst 11 done
+04:44:44 modem restart 11 done
+04:49:04 chaos burst 12 done
+=== tcp
+tcp session 1: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 2: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 3: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 4: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 5: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 6: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 7: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 8: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 9: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 10: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 11: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 12: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+=== ping
+32408 packets transmitted, 31218 received, 3.67193% packet loss, time 3599987ms
+rtt min/avg/max/mdev = 0.820/969.256/6120.377/868.549 ms, pipe 66
+=== ap
+state: UP
+link_ups: 461
+link_resets: 460 (hb_timeout 0, peer_gen 185, peer_down 127, ring 148)
+ rx_len_errors: 8  rx_proto_errors: 1  rx_stalls: 690  ring_corruptions: 148  hb_saved_by_ring: 14677  hdr_repairs: 133  tx_stalls: 1
+kmemleak reports: 0
+DMESG GATE: PASS (mlink-ap)
+=== modem
+state: UP
+link_ups: 33
+link_resets: 32 (hb_timeout 0, peer_gen 20, peer_down 7, ring 5)
+ rx_len_errors: 0  rx_proto_errors: 0  rx_stalls: 103  ring_corruptions: 5  hb_saved_by_ring: 1052  hdr_repairs: 0  tx_stalls: 0
+kmemleak reports: 0
+DMESG GATE: FAIL (mlink-modem)
+[ 4120.957594] watchdog: BUG: soft lockup - CPU#0 stuck for 22s! [iperf3:2557]
+[ 4120.957934] Call Trace:
+=== long soak end 2026-10-27T04:50:03+05:30 chaos_bursts=12 modem_restarts=11 max_temp=56C aborted=0
+# modem soft lockup trace:
+[ 4120.957594] watchdog: BUG: soft lockup - CPU#0 stuck for 22s! [iperf3:2557]
+[ 4120.957622] Modules linked in: mlink(O) [last unloaded: mlink(O)]
+[ 4120.957642] irq event stamp: 3133733
+[ 4120.957647] hardirqs last  enabled at (3133732): [<ffffffff83908fb4>] _raw_spin_unlock_irqrestore+0x44/0x60
+[ 4120.957684] hardirqs last disabled at (3133733): [<ffffffff838e126e>] sysvec_apic_timer_interrupt+0xe/0x80
+[ 4120.957700] softirqs last  enabled at (3133476): [<ffffffff8146d16c>] handle_softirqs+0x51c/0x6b0
+[ 4120.957717] softirqs last disabled at (3133481): [<ffffffff8146d421>] __irq_exit_rcu+0xb1/0xf0
+[ 4120.957753] CPU: 0 UID: 0 PID: 2557 Comm: iperf3 Tainted: G           O        6.18.59-mlink-debug #1 PREEMPT(voluntary) 
+[ 4120.957796] Tainted: [O]=OOT_MODULE
+[ 4120.957806] Hardware name: QEMU Standard PC (i440FX + PIIX, 1996), BIOS 1.17.0-debian-1.17.0-1 04/01/2014
+[ 4120.957818] RIP: 0010:unwind_next_frame+0xb3a/0x2080
+[ 4120.957835] Code: 7d 11 00 00 49 89 44 24 50 48 b8 00 00 00 00 00 fc ff df 4c 89 e2 48 c1 ea 03 0f b6 04 02 84 c0 74 08 3c 03 0f 8e e2 12 00 00 <41> 39 1c 24 0f 84 00 09 00 00 bd 01 00 00 00 e9 a2 f8 ff ff 4c 8b
+[ 4120.957850] RSP: 0018:ffff888036008510 EFLAGS: 00000246
+[ 4120.957865] RAX: 0000000000000000 RBX: 0000000000000002 RCX: 1ffff11006c010bb
+[ 4120.957873] RDX: 1ffff11006c010b1 RSI: ffff888036008908 RDI: ffff8880360085d8
+[ 4120.957881] RBP: ffff888036008908 R08: ffffffff858e917e R09: ffffffff858e9182
+[ 4120.957888] R10: ffffffff81d2d802 R11: 0000000000000000 R12: ffff888036008588
+[ 4120.957895] R13: ffff888036008658 R14: ffff888036008918 R15: ffff88800ac68000
+[ 4120.957903] FS:  00007f365c6ec6c0(0000) GS:ffff8880aff0a000(0000) knlGS:0000000000000000
+[ 4120.957918] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
+[ 4120.957926] CR2: 00007f64a5c343f0 CR3: 0000000013042005 CR4: 0000000000370ef0
+[ 4120.957934] Call Trace:
+[ 4120.957940]  <IRQ>
+[ 4120.957946]  ? __kasan_slab_alloc+0x63/0x80
+[ 4120.957979]  ? __pfx_stack_trace_consume_entry+0x10/0x10
+[ 4120.958000]  arch_stack_walk+0xa1/0x100
+[ 4120.958037]  ? kmem_cache_alloc_noprof+0x1d6/0x680
+[ 4120.958069]  stack_trace_save+0x93/0xd0
+[ 4120.958087]  ? __pfx_stack_trace_save+0x10/0x10
+[ 4120.958129]  kasan_save_stack+0x30/0x50
+[ 4120.958145]  ? kasan_save_stack+0x30/0x50
+[ 4120.958158]  ? kasan_save_track+0x14/0x30
+[ 4120.958171]  ? __kasan_slab_alloc+0x63/0x80
+[ 4120.958311]  kasan_save_track+0x14/0x30
+[ 4120.958328]  __kasan_slab_alloc+0x63/0x80
+[ 4120.958348]  kmem_cache_alloc_noprof+0x1d6/0x680
+[ 4120.958389]  ? __alloc_object+0x30/0x230
+[ 4120.958404]  __alloc_object+0x30/0x230
+[ 4120.958423]  __create_object+0x26/0xd0
+[ 4120.958437]  ? kasan_save_track+0x14/0x30
+[ 4120.958462]  kmem_cache_alloc_node_noprof+0x4f0/0x690
+[ 4120.958502]  ? kmalloc_reserve+0x13b/0x250
+[ 4120.958519]  kmalloc_reserve+0x13b/0x250
+[ 4120.958546]  __alloc_skb+0xee/0x2f0
+[ 4120.958559]  ? lock_release+0xd4/0x2f0
+[ 4120.958576]  ? __pfx___alloc_skb+0x10/0x10
+[ 4120.958597]  ? dev_gro_receive+0x1ee/0x2890
+[ 4120.958638]  napi_alloc_skb+0x3e/0x690
+[ 4120.958665]  mlink_net_rx+0xb7/0x630 [mlink]
+[ 4120.958706]  ? gro_receive_skb+0x7d0/0xb20
+[ 4120.958731]  mlink_rx_poll+0x152/0x8e0 [mlink]
+[ 4120.958772]  ? lock_is_held_type+0x87/0xf0
+[ 4120.958800]  ? __pfx_mlink_rx_poll+0x10/0x10 [mlink]
+[ 4120.958872]  mlink_napi_poll+0x51/0x2c0 [mlink]
+[ 4120.958915]  __napi_poll.constprop.0+0xa4/0x370
+[ 4120.958940]  net_rx_action+0x850/0xde0
+[ 4120.958962]  ? lock_acquire+0x14e/0x2d0
+[ 4120.958994]  ? __pfx_net_rx_action+0x10/0x10
+[ 4120.959013]  ? timerqueue_add+0x20b/0x3c0
+[ 4120.959043]  ? clockevents_program_event+0xf1/0x300
+[ 4120.959098]  ? mark_held_locks+0x40/0x70
