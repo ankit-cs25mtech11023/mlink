@@ -59,7 +59,7 @@
 - [x] P4.3 Implement teardown and re-handshake (carrier off, stop queue, napi_disable, drop in-flight, reset owned indices, re-UP)
 - [x] P4.4 Implement STATE vector for fast graceful-down detection
 - [x] P4.5 Run SSR scenarios a–e with live TCP + ping and record detection/recovery times, ping gap, TCP survival, packets lost
-- [ ] P4.6 Write `docs/walkthrough/phase4.md`
+- [x] P4.6 Write `docs/walkthrough/phase4.md`
 - [ ] P4.7 Study gate 4 passed (state machines, workqueues vs softirq, napi_disable semantics, failure detection trade-offs)
 
 ## Phase 5: Hardening & correctness
