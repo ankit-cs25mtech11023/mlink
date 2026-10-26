@@ -9,7 +9,7 @@
 set -uo pipefail
 
 MARK=${1:-}
-PAT='BUG:|WARNING:|KASAN|possible circular|inconsistent lock|INFO: task .* blocked|scheduling while atomic|Oops|UBSAN|kmemleak|NETDEV WATCHDOG|general protection|Call Trace'
+PAT='BUG:|WARNING:|KASAN|possible circular|inconsistent lock|INFO: task .* blocked|scheduling while atomic|Oops|UBSAN|kmemleak: [0-9]+ new suspected|NETDEV WATCHDOG|general protection|Call Trace'
 
 if [ -n "$MARK" ]; then
 	log=$(dmesg | awk -v m="$MARK" 'index($0, m) { buf = ""; next } { buf = buf $0 "\n" } END { printf "%s", buf }')

@@ -5,7 +5,7 @@
 
 ## Phase 0: Environment & bootstrap
 - [x] P0.1 Create repo skeleton on Windows (git init, LF .gitattributes, .gitignore, GPL-2.0 LICENSE, directory tree, first commit)
-- [ ] P0.2 Create public GitHub repo `mlink`, add SSH remote, verify `ssh -T git@github.com`, first push after user confirms
+- [x] P0.2 Create public GitHub repo `mlink`, add SSH remote, verify `ssh -T git@github.com`, first push after user confirms
 - [x] P0.3 Add user-approved `~/.ssh/config` aliases on Windows (kali, mlink-ap, mlink-modem) and verify `ssh kali hostname`
 - [x] P0.4 Write `setup-root.sh`; user runs it with sudo in their own terminal (packages, work dirs, narrow NOPASSWD rule for mlink-bench-prep only)
 - [x] P0.4b User writes `~/D/mlink-work/.secrets/sudo.pass` (0600); `msudo.sh true` works and logs to `logs/sudo.log` without exposing the password
@@ -26,7 +26,7 @@
 - [x] P1.5 Implement peer discovery through state blocks (publish own peer_id + magic, poll for peer)
 - [x] P1.6 Add debugfs: info, irq_counts, ring_doorbell, and in-kernel doorbell ping-pong RTT histogram
 - [x] P1.7 Record first doorbell RTT histogram (debug kernel, labeled) in bench/results
-- [ ] P1.8 Pass 100× insmod/rmmod loop on each side under traffic with KASAN/lockdep clean and correct teardown order
+- [x] P1.8 Pass 100× insmod/rmmod loop on each side under traffic with KASAN/lockdep clean and correct teardown order
 - [ ] P1.9 Write `docs/walkthrough/phase1.md`
 - [ ] P1.10 Study gate 1 passed (PCI, BARs, MSI-X, IRQ context, devm, teardown ordering)
 
