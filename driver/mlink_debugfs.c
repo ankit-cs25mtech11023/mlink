@@ -321,6 +321,9 @@ void mlink_debugfs_init(struct mlink_dev *mdev)
 	debugfs_create_file("stats", 0444, mdev->dbg, mdev, &stats_fops);
 	debugfs_create_file("ring", 0444, mdev->dbg, mdev, &ring_fops);
 	debugfs_create_file("link", 0444, mdev->dbg, mdev, &link_fops);
+	debugfs_create_u32("fault_drop_kick", 0600, mdev->dbg, &mdev->fault.drop_kick);
+	debugfs_create_u32("fault_delay_kick_us", 0600, mdev->dbg, &mdev->fault.delay_kick_us);
+	debugfs_create_u32("fault_corrupt_tx_len", 0600, mdev->dbg, &mdev->fault.corrupt_tx_len);
 }
 
 void mlink_debugfs_exit(struct mlink_dev *mdev)

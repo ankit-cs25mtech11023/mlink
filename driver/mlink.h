@@ -77,6 +77,9 @@ struct mlink_stats {
 	u64 link_resets;		/* link work */
 	u64 link_ups;			/* link work */
 	u64 hb_saved_by_ring;		/* heartbeat stale but peer ring progress seen */
+	u64 fault_kicks_dropped;	/* P5.2 injected */
+	u64 fault_kicks_delayed;	/* P5.2 injected */
+	u64 fault_lens_corrupted;	/* P5.2 injected */
 };
 
 /* Ring selftest (P2.3): sequence-numbered pseudo-random payloads. */
@@ -160,6 +163,14 @@ struct mlink_dev {
 	struct mlink_pingpong pp;
 	struct mlink_selftest st;
 	struct dentry *dbg;
+
+	/* Fault injection knobs (debugfs, P5.2); 0 = off. Read in xmit only. */
+	struct {
+		u32 drop_kick;		/* drop 1 of N DATA kicks */
+		u32 delay_kick_us;	/* busy-wait before each DATA kick (<= 1000) */
+		u32 corrupt_tx_len;	/* publish 1 of N packets with an invalid len */
+		u32 n_kick, n_len;	/* xmit-private counters */
+	} fault;
 };
 
 /* Named view of struct mlink_stats for ethtool -S and debugfs (mlink_net.c). */

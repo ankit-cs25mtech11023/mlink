@@ -1,0 +1,29 @@
+# P5.2 fault injection — kernel 6.18.59-mlink-debug (DEBUG), 2026-10-27T03:22:32+05:30
+# command: bash bench/run_p5_faults.sh ; faults injected on the AP TX path, counters cumulative
+== drop every 10th DATA kick (fault_drop_kick=10)
+646 packets transmitted, 645 received, 0.154799% packet loss, time 14994ms
+tcp: 46.6 Mbits/sec retr 0
+ap:     tx_kicks: 1931  fault_kicks_dropped: 192  fault_kicks_delayed: 0  fault_lens_corrupted: 0 
+modem:  rx_len_errors: 0  rx_stalls: 0  ring_corruptions: 0  link_resets: 0 
+after fault off: 0% packet loss
+== drop every 2nd DATA kick (fault_drop_kick=2)
+612 packets transmitted, 611 received, 0.163399% packet loss, time 14993ms
+tcp: 43.8 Mbits/sec retr 0
+ap:     tx_kicks: 4230  fault_kicks_dropped: 1292  fault_kicks_delayed: 0  fault_lens_corrupted: 0 
+modem:  rx_len_errors: 0  rx_stalls: 1  ring_corruptions: 0  link_resets: 0 
+after fault off: 0% packet loss
+== delay every DATA kick 200 us (fault_delay_kick_us=200)
+390 packets transmitted, 390 received, 0% packet loss, time 14980ms
+tcp: 48.1 Mbits/sec retr 0
+ap:     tx_kicks: 6250  fault_kicks_dropped: 1292  fault_kicks_delayed: 1920  fault_lens_corrupted: 0 
+modem:  rx_len_errors: 0  rx_stalls: 1  ring_corruptions: 0  link_resets: 0 
+after fault off: 0% packet loss
+== invalid len on every 50th packet (fault_corrupt_tx_len=50)
+725 packets transmitted, 715 received, 1.37931% packet loss, time 14985ms
+tcp: 17.1 Mbits/sec retr 457
+ap:     tx_kicks: 19917  fault_kicks_dropped: 1292  fault_kicks_delayed: 1920  fault_lens_corrupted: 468 
+modem:  rx_len_errors: 468  rx_stalls: 1  ring_corruptions: 0  link_resets: 0 
+after fault off: 0% packet loss
+== dmesg gate
+DMESG GATE: PASS (mlink-ap)
+DMESG GATE: PASS (mlink-modem)

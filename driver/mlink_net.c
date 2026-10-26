@@ -3,6 +3,7 @@
  * mlink network device: raw-IP point-to-point netdev on top of the rings.
  * Modelled on modem-style drivers (mhi_net, rmnet): no L2 header, no ARP.
  */
+#include <linux/delay.h>
 #include <linux/etherdevice.h>
 #include <linux/ethtool.h>
 #include <linux/if_arp.h>
@@ -29,6 +30,38 @@ static void mlink_tx_drop(struct mlink_dev *mdev, struct sk_buff *skb)
 	mdev->tx_stats.dropped++;
 	u64_stats_update_end(&mdev->tx_stats.syncp);
 	dev_kfree_skb_any(skb);
+}
+
+/*
+ * Fault injection (P5.2). Called only from xmit, so the counters need no
+ * locking. Returns true if the DATA kick must be swallowed.
+ */
+static bool mlink_fault_kick(struct mlink_dev *mdev)
+{
+	u32 n = READ_ONCE(mdev->fault.drop_kick);
+	u32 us = READ_ONCE(mdev->fault.delay_kick_us);
+
+	if (us) {
+		udelay(min(us, 1000U));	/* BH context: busy-wait, bounded */
+		mdev->stats.fault_kicks_delayed++;
+	}
+	if (n && ++mdev->fault.n_kick % n == 0) {
+		mdev->stats.fault_kicks_dropped++;
+		return true;
+	}
+	return false;
+}
+
+/* Publish 1 of N packets with a length the consumer must reject. */
+static u32 mlink_fault_len(struct mlink_dev *mdev, u32 len)
+{
+	u32 n = READ_ONCE(mdev->fault.corrupt_tx_len);
+
+	if (n && ++mdev->fault.n_len % n == 0) {
+		mdev->stats.fault_lens_corrupted++;
+		return MLINK_SLOT_SIZE + 1;
+	}
+	return len;
 }
 
 /* Serialized by the core's TX lock: we are the ring's only producer. */
@@ -91,7 +124,7 @@ static netdev_tx_t mlink_start_xmit(struct sk_buff *skb, struct net_device *ndev
 
 	/* Copy (no zero-copy): the peer must never see pointers into our memory. */
 	skb_copy_bits(skb, 0, mlink_ring_slot(r), len);
-	mlink_ring_publish(r, len, proto, mdev->tx_seq++);
+	mlink_ring_publish(r, mlink_fault_len(mdev, len), proto, mdev->tx_seq++);
 
 	u64_stats_update_begin(&mdev->tx_stats.syncp);
 	mdev->tx_stats.packets++;
@@ -116,7 +149,8 @@ static netdev_tx_t mlink_start_xmit(struct sk_buff *skb, struct net_device *ndev
 		return NETDEV_TX_OK;
 	}
 	if (!kick_suppress || mlink_ring_need_kick(r, safe)) {
-		mlink_kick(mdev, MLINK_VEC_DATA);
+		if (!mlink_fault_kick(mdev))
+			mlink_kick(mdev, MLINK_VEC_DATA);
 		mdev->stats.tx_kicks++;
 		trace_mlink_xmit(len, r->idx, true);
 	} else {
@@ -275,6 +309,7 @@ const struct mlink_stat_desc mlink_stat_descs[] = {
 	S(rx_msgs), S(napi_polls), S(napi_budget_exhausted), S(rx_len_errors),
 	S(rx_proto_errors), S(rx_stalls), S(space_kicks), S(ring_corruptions),
 	S(link_resets), S(link_ups), S(hb_saved_by_ring),
+	S(fault_kicks_dropped), S(fault_kicks_delayed), S(fault_lens_corrupted),
 #undef S
 };
 
