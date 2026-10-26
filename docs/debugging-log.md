@@ -115,3 +115,23 @@ Format: symptom → hypotheses → evidence → root cause → fix → lesson. N
 - **Lesson / interview point:** failure detectors trade detection latency against false
   positives; a heartbeat produced by a *different* execution context than the one doing the
   work can starve independently — use the work itself as evidence of life where possible.
+
+---
+
+## 2026-10-27 — P5.1: shm_chaos "flags" → silent black hole (link UP, 100 % loss)
+
+- **Symptom:** after a storm of random `want_kick`/`want_space` writes, both sides stayed UP
+  with no reset, but ping failed indefinitely. Other chaos modes self-healed.
+- **First fix (needed, not sufficient):** a netdev TX watchdog — queue stopped while the ring
+  has room for two polls → wake it (`tx_stalls`).
+- **Evidence:** ring dump on the modem: RX ring full (`prod - cons = 256`) with
+  `want_kick = 0`, NAPI idle. `want_kick = 0` means "I'm polling, don't kick", so the producer
+  stopped kicking; the consumer was actually asleep.
+- **Root cause:** the RX lost-kick watchdog only fired when `want_kick == 1` — it trusted a
+  flag that lives in shared memory, i.e. exactly the untrusted input the design says never to
+  trust.
+- **Fix:** decide on local facts only: data pending and our consumer index unchanged across
+  two polls → schedule NAPI (which re-arms the flag correctly). Re-run: ping OK at every
+  second of recovery, 0 resets; full campaign: all 7 modes recover in ≤ 3.2 s.
+- **Lesson:** "untrusted shared memory" applies to *control* decisions too (watchdogs,
+  liveness), not just lengths and indices. A fault injector finds what code review missed.

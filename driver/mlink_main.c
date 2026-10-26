@@ -174,7 +174,7 @@ bool mlink_hdr_valid(struct mlink_dev *mdev)
 }
 
 /* AP only: (re)write the header. The modem must never see half of it. */
-static void mlink_hdr_publish(struct mlink_dev *mdev)
+void mlink_hdr_publish(struct mlink_dev *mdev)
 {
 	struct mlink_shm_hdr *sh = mdev->hdr;
 	struct mlink_shm_hdr want;

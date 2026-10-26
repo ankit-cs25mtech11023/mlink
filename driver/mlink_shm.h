@@ -11,9 +11,19 @@
 #ifndef _MLINK_SHM_H
 #define _MLINK_SHM_H
 
+#ifdef __KERNEL__
 #include <linux/build_bug.h>
 #include <linux/stddef.h>
 #include <linux/types.h>
+#else
+/* Userspace (tools/shm_chaos.c) shares this ABI header. */
+#include <stddef.h>
+#include <stdint.h>
+typedef uint16_t u16;
+typedef uint32_t u32;
+#define static_assert _Static_assert
+#define __aligned(x) __attribute__((aligned(x)))
+#endif
 
 #define MLINK_SHM_MAGIC		0x4b4e4c4d	/* "MLNK" in memory order */
 #define MLINK_STATE_MAGIC	0x54534c4d	/* "MLST" */

@@ -77,6 +77,8 @@ struct mlink_stats {
 	u64 link_resets;		/* link work */
 	u64 link_ups;			/* link work */
 	u64 hb_saved_by_ring;		/* heartbeat stale but peer ring progress seen */
+	u64 hdr_repairs;		/* AP: corrupted shared header rewritten */
+	u64 tx_stalls;			/* link work: stopped queue woken (lost SPACE kick) */
 	u64 fault_kicks_dropped;	/* P5.2 injected */
 	u64 fault_kicks_delayed;	/* P5.2 injected */
 	u64 fault_lens_corrupted;	/* P5.2 injected */
@@ -135,6 +137,7 @@ struct mlink_dev {
 	bool tx_broken;			/* xmit/selftest: impossible index; link work resets */
 	u32 rx_stall_seen;		/* link work: "armed, pending, no progress" polls */
 	u32 rx_stall_idx;		/* link work: rx.idx at the first such poll */
+	u32 tx_stall_seen;		/* link work: queue stopped with ring space */
 	wait_queue_head_t tx_wq;	/* selftest producer, woken by the SPACE irq */
 	atomic_t tx_owner;		/* MLINK_TX_* */
 	u32 tx_seq;
@@ -189,6 +192,7 @@ static inline u64 mlink_stat_read(struct mlink_dev *mdev, unsigned int i)
 
 void mlink_kick(struct mlink_dev *mdev, enum mlink_vector vec);
 bool mlink_hdr_valid(struct mlink_dev *mdev);
+void mlink_hdr_publish(struct mlink_dev *mdev);
 
 /* mlink_link.c */
 void mlink_link_start(struct mlink_dev *mdev);

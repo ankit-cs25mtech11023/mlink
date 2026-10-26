@@ -166,10 +166,6 @@ void mlink_ring_disarm_kick(struct mlink_ring *r)
 	WRITE_ONCE(r->ctrl->want_kick.val, 0);
 }
 
-bool mlink_ring_kick_armed(struct mlink_ring *r)
-{
-	return READ_ONCE(r->ctrl->want_kick.val);
-}
 
 u32 mlink_ring_pending(struct mlink_ring *r)
 {

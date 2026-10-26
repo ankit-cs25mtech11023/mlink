@@ -160,7 +160,13 @@ void mlink_link_stop(struct mlink_dev *mdev)
 /* Lost-DATA-kick watchdog; see phase2 walkthrough §7. */
 static void mlink_link_rx_watchdog(struct mlink_dev *mdev)
 {
-	if (mlink_ring_kick_armed(&mdev->rx) && mlink_ring_pending(&mdev->rx) &&
+	/*
+	 * Decide on local facts only: data pending and our consumer index has
+	 * not moved for two polls. Do NOT require want_kick == 1: that flag
+	 * lives in shm, and shm_chaos "flags" cleared it while we were idle,
+	 * so the producer stopped kicking and the old check never fired.
+	 */
+	if (mlink_ring_pending(&mdev->rx) &&
 	    (!mdev->rx_stall_seen || mdev->rx.idx == mdev->rx_stall_idx)) {
 		mdev->rx_stall_idx = mdev->rx.idx;
 		if (++mdev->rx_stall_seen >= 2) {
@@ -174,6 +180,35 @@ static void mlink_link_rx_watchdog(struct mlink_dev *mdev)
 	} else {
 		mdev->rx_stall_seen = 0;
 	}
+}
+
+/*
+ * Lost-SPACE-kick watchdog for the netdev TX queue: stopped, yet the ring has
+ * room on two consecutive polls. Found by shm_chaos "flags" (want_space
+ * cleared while the producer waited): the queue stayed stopped forever.
+ */
+static void mlink_link_tx_watchdog(struct mlink_dev *mdev)
+{
+	struct net_device *ndev = mdev->ndev;
+
+	if (netif_running(ndev) && netif_queue_stopped(ndev) &&
+	    mlink_ring_free(&mdev->tx) > 0) {
+		if (++mdev->tx_stall_seen >= 2) {
+			mdev->stats.tx_stalls++;
+			mdev->tx_stall_seen = 0;
+			mlink_ring_disarm_space(&mdev->tx);
+			netif_wake_queue(ndev);
+		}
+	} else {
+		mdev->tx_stall_seen = 0;
+	}
+}
+
+/* UP and healthy: look for lost kicks in both directions. */
+static void mlink_link_watchdogs(struct mlink_dev *mdev)
+{
+	mlink_link_rx_watchdog(mdev);
+	mlink_link_tx_watchdog(mdev);
 }
 
 void mlink_link_work(struct work_struct *work)
@@ -195,6 +230,13 @@ void mlink_link_work(struct work_struct *work)
 		WRITE_ONCE(mdev->hdr_ok, true);
 		dev_info(dev, "shared header valid (abi %u)\n", MLINK_ABI_VERSION);
 		mlink_link_start(mdev);
+	}
+
+	/* AP owns the header: repair it if something corrupted it (P5.1 chaos). */
+	if (mdev->role == MLINK_ROLE_AP && !mlink_hdr_valid(mdev)) {
+		mdev->stats.hdr_repairs++;
+		dev_warn_ratelimited(dev, "shared header corrupted, rewriting\n");
+		mlink_hdr_publish(mdev);
 	}
 
 	/* Our heartbeat: proof of life for the peer's watchdog. */
@@ -254,7 +296,7 @@ void mlink_link_work(struct work_struct *work)
 		else if (READ_ONCE(mdev->rx_broken) || READ_ONCE(mdev->tx_broken))
 			mlink_link_reset(mdev, MLINK_RESET_RING);
 		else
-			mlink_link_rx_watchdog(mdev);
+			mlink_link_watchdogs(mdev);
 		goto again;
 	}
 

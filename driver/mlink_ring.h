@@ -47,7 +47,6 @@ void mlink_ring_release(struct mlink_ring *r);
 bool mlink_ring_need_space_kick(struct mlink_ring *r, bool safe);
 bool mlink_ring_arm_kick(struct mlink_ring *r, bool safe);
 void mlink_ring_disarm_kick(struct mlink_ring *r);
-bool mlink_ring_kick_armed(struct mlink_ring *r);
 u32 mlink_ring_pending(struct mlink_ring *r);
 
 #endif /* _MLINK_RING_H */

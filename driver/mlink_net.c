@@ -308,7 +308,7 @@ const struct mlink_stat_desc mlink_stat_descs[] = {
 	S(tx_space_waits), S(tx_lost_space_wakeups), S(tx_space_timeouts),
 	S(rx_msgs), S(napi_polls), S(napi_budget_exhausted), S(rx_len_errors),
 	S(rx_proto_errors), S(rx_stalls), S(space_kicks), S(ring_corruptions),
-	S(link_resets), S(link_ups), S(hb_saved_by_ring),
+	S(link_resets), S(link_ups), S(hb_saved_by_ring), S(hdr_repairs), S(tx_stalls),
 	S(fault_kicks_dropped), S(fault_kicks_delayed), S(fault_lens_corrupted),
 #undef S
 };

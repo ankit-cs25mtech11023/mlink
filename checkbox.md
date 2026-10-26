@@ -63,7 +63,7 @@
 - [ ] P4.7 Study gate 4 passed (state machines, workqueues vs softirq, napi_disable semantics, failure detection trade-offs)
 
 ## Phase 5: Hardening & correctness
-- [ ] P5.1 Write host-side `shm_chaos` corruption injector and show driver survives (no crash, KASAN clean, counts errors, self-heals)
+- [x] P5.1 Write host-side `shm_chaos` corruption injector and show driver survives (no crash, KASAN clean, counts errors, self-heals)
 - [x] P5.2 Add debugfs fault knobs (drop kick, delay kick, corrupt tx len) and verify TCP + link self-heal
 - [x] P5.3 Make driver checkpatch --strict, sparse (C=1) and W=1 clean
 - [ ] P5.4 (optional) Build KCSAN kernel and run soak
