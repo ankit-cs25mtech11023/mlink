@@ -44,3 +44,27 @@ Format: symptom → hypotheses → evidence → root cause → fix → lesson. N
 - **Lesson:** `setsid` detaches a process from terminal job control — whoever does that owns
   its lifetime. Same idea as a driver that schedules work: whoever schedules it must cancel it
   (`cancel_delayed_work_sync` in `remove()`).
+
+---
+
+## 2026-10-27 — P2.4: trying to provoke a lost wakeup with `unsafe_no_mb=1`
+
+- **Goal:** show the store-buffering race behind kick suppression at runtime.
+- **Setup:** `unsafe_no_mb=1` on both guests drops `virt_mb()` from all four kick-path
+  helpers. Detectors: producer `lost_space_wakeups` (space appeared but no SPACE irq arrived
+  while armed); consumer `rx_stalls` (link work sees `want_kick` armed + data pending on two
+  consecutive 100 ms polls, then recovers).
+- **Result:** 2 × 10 M messages with barriers removed: **0 lost wakeups, 0 stalls**, same
+  throughput (~268k msg/s) as with barriers. File: `bench/results/p2-lost-wakeup-debug.txt`.
+- **Why it doesn't reproduce here (analysis, not proof):**
+  1. Streaming keeps the ring mostly full (~120k space-waits per 10 M): the consumer rarely
+     goes idle exactly while the producer publishes, so the race window is rarely entered.
+  2. Every kick is an MMIO write → VM exit, which is serializing on x86 and drains the
+     store buffer on that path.
+  3. `wait_event`/`queue_work` take spinlocks (LOCK-prefixed atomics = full barriers on x86)
+     close to the arm/check points, which often provide the missing ordering by accident.
+- **Conclusion:** the barriers are proven necessary by LKMM (`litmus/`, two "Sometimes"
+  results); the runtime test shows only that this workload rarely hits the window. Next idea:
+  a *paced* selftest (one message, short idle, repeat) to maximise arm/publish collisions.
+- **Lesson:** absence of a failure in testing ≠ correctness; memory-ordering bugs need a model
+  checker or a targeted stress that lives inside the race window.

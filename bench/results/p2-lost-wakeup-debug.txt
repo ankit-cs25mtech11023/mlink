@@ -1,0 +1,16 @@
+# P2.4 lost-wakeup experiment — DEBUG kernel 6.18.59-mlink-debug, turbo off
+# date: 2026-10-27T01:52:09+05:30
+# unsafe_no_mb=1 on BOTH sides removes the virt_mb() in all four kick-path helpers (SB pattern).
+# evidence counters: producer lost_space_wakeups (space appeared, no SPACE irq), consumer rx_stalls (kick armed + data pending >=100 ms)
+== unsafe_no_mb=1 ap -> modem
+producer: tx_sent 10000000 err 0 ns 37114602334 msgs_per_s 269435 kicks 2897 suppressed 9997103 space_waits 120156 lost_space_wakeups 0 kick_suppress 1 unsafe_no_mb 1
+consumer: rx_ok 10000000 lost 0 dup_ooo 0 corrupt 0 next_seq 10000000 msgs_per_s 269433 rx_stalls_delta=0
+== unsafe_no_mb=1 modem -> ap
+producer: tx_sent 10000000 err 0 ns 37470764303 msgs_per_s 266874 kicks 3374 suppressed 9996626 space_waits 123957 lost_space_wakeups 0 kick_suppress 1 unsafe_no_mb 1
+consumer: rx_ok 10000000 lost 0 dup_ooo 0 corrupt 0 next_seq 10000000 msgs_per_s 266871 rx_stalls_delta=0
+== unsafe_no_mb=0 ap -> modem
+producer: tx_sent 10000000 err 0 ns 36955645217 msgs_per_s 270594 kicks 2140 suppressed 9997860 space_waits 117902 lost_space_wakeups 0 kick_suppress 1 unsafe_no_mb 0
+consumer: rx_ok 10000000 lost 0 dup_ooo 0 corrupt 0 next_seq 10000000 msgs_per_s 270592 rx_stalls_delta=0
+== unsafe_no_mb=0 modem -> ap
+producer: tx_sent 10000000 err 0 ns 37532598079 msgs_per_s 266435 kicks 1691 suppressed 9998309 space_waits 128664 lost_space_wakeups 0 kick_suppress 1 unsafe_no_mb 0
+consumer: rx_ok 10000000 lost 0 dup_ooo 0 corrupt 0 next_seq 10000000 msgs_per_s 266432 rx_stalls_delta=0

@@ -1,0 +1,30 @@
+C mlink-slot-reuse
+
+(*
+ * Result: Never
+ *
+ * mlink_ring_release() / mlink_ring_free(): the consumer reads a slot and
+ * then store-releases cons; the producer load-acquires cons and only then
+ * overwrites the slot. The consumer must never read the *next* message's
+ * bytes out of a slot it is still consuming (load-buffering pattern).
+ *)
+
+{}
+
+P0(int *slot, int *cons)
+{
+	int r0;
+
+	r0 = READ_ONCE(*slot);
+	smp_store_release(cons, 1);
+}
+
+P1(int *slot, int *cons)
+{
+	int r1;
+
+	r1 = smp_load_acquire(cons);
+	WRITE_ONCE(*slot, 2);
+}
+
+exists (0:r0=2 /\ 1:r1=1)

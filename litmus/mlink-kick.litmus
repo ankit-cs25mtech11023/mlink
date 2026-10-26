@@ -1,0 +1,34 @@
+C mlink-kick
+
+(*
+ * Result: Never
+ *
+ * Kick suppression (mlink_ring_need_kick / mlink_ring_arm_kick):
+ *   producer: publish prod; full barrier; read want_kick -> kick if set
+ *   consumer: set want_kick; full barrier; re-read prod -> poll if new data
+ * The lost wakeup is: producer sees want_kick == 0 (no kick) AND consumer
+ * sees the old prod (goes idle). Store-buffering pattern: forbidden only if
+ * BOTH sides have a full barrier between their store and their load.
+ *)
+
+{}
+
+P0(int *prod, int *want_kick)
+{
+	int r0;
+
+	smp_store_release(prod, 1);
+	smp_mb();
+	r0 = READ_ONCE(*want_kick);
+}
+
+P1(int *prod, int *want_kick)
+{
+	int r1;
+
+	WRITE_ONCE(*want_kick, 1);
+	smp_mb();
+	r1 = READ_ONCE(*prod);
+}
+
+exists (0:r0=0 /\ 1:r1=0)

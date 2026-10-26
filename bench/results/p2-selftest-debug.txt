@@ -1,0 +1,25 @@
+# P2.3 ring selftest — kernel 6.18.59-mlink-debug (DEBUG: KASAN+lockdep, not a headline number)
+# date: 2026-10-27T01:45:41+05:30
+# host: i5-8250U, governors:  8 performance; no_turbo: 1 prep: ON (state saved) 
+# command: bash bench/run_p2_selftest.sh 10000000
+# producer: echo N > /sys/kernel/debug/mlink/selftest ; consumer verifies seq/len/xorshift payload
+== ap -> modem kick_suppress=1
+producer: tx_sent 10000000 err 0 ns 37162884632 msgs_per_s 269085 kicks 3363 suppressed 9996637 space_waits 119962 lost_space_wakeups 0 kick_suppress 1 unsafe_no_mb 0
+consumer: rx_ok 10000000 lost 0 dup_ooo 0 corrupt 0 next_seq 10000000 msgs_per_s 269080
+consumer: rx_stalls=0 ring_corruptions=0
+temp: 47C
+== ap -> modem kick_suppress=0
+producer: tx_sent 10000000 err 0 ns 106714612542 msgs_per_s 93707 kicks 10000000 suppressed 0 space_waits 133669 lost_space_wakeups 0 kick_suppress 0 unsafe_no_mb 0
+consumer: rx_ok 10000000 lost 0 dup_ooo 0 corrupt 0 next_seq 10000000 msgs_per_s 93708
+consumer: rx_stalls=0 ring_corruptions=0
+temp: 47C
+== modem -> ap kick_suppress=1
+producer: tx_sent 10000000 err 0 ns 37338705102 msgs_per_s 267818 kicks 1552 suppressed 9998448 space_waits 123297 lost_space_wakeups 0 kick_suppress 1 unsafe_no_mb 0
+consumer: rx_ok 10000000 lost 0 dup_ooo 0 corrupt 0 next_seq 10000000 msgs_per_s 267816
+consumer: rx_stalls=0 ring_corruptions=0
+temp: 46C
+== modem -> ap kick_suppress=0
+producer: tx_sent 10000000 err 0 ns 106769406189 msgs_per_s 93659 kicks 10000000 suppressed 0 space_waits 140875 lost_space_wakeups 0 kick_suppress 0 unsafe_no_mb 0
+consumer: rx_ok 10000000 lost 0 dup_ooo 0 corrupt 0 next_seq 10000000 msgs_per_s 93659
+consumer: rx_stalls=0 ring_corruptions=0
+temp: 47C

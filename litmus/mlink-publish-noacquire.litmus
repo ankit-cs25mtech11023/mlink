@@ -1,0 +1,28 @@
+C mlink-publish-noacquire
+
+(*
+ * Result: Sometimes
+ *
+ * BROKEN variant of mlink-publish: the consumer reads prod with a plain
+ * READ_ONCE (no acquire), so its payload load may be satisfied before the
+ * prod load -> it can consume a slot whose payload it has not seen yet.
+ *)
+
+{}
+
+P0(int *payload, int *prod)
+{
+	WRITE_ONCE(*payload, 1);
+	smp_store_release(prod, 1);
+}
+
+P1(int *payload, int *prod)
+{
+	int r0;
+	int r1;
+
+	r0 = READ_ONCE(*prod);
+	r1 = READ_ONCE(*payload);
+}
+
+exists (1:r0=1 /\ 1:r1=0)

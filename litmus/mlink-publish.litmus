@@ -1,0 +1,30 @@
+C mlink-publish
+
+(*
+ * Result: Never
+ *
+ * mlink_ring_publish() / mlink_ring_peek(): the producer writes the payload
+ * (and descriptor) and then store-releases prod; the consumer load-acquires
+ * prod and then reads the payload. Seeing the new prod with a stale payload
+ * must be impossible (message-passing pattern).
+ * virt_store_release/virt_load_acquire have smp_* semantics in LKMM.
+ *)
+
+{}
+
+P0(int *payload, int *prod)
+{
+	WRITE_ONCE(*payload, 1);
+	smp_store_release(prod, 1);
+}
+
+P1(int *payload, int *prod)
+{
+	int r0;
+	int r1;
+
+	r0 = smp_load_acquire(prod);
+	r1 = READ_ONCE(*payload);
+}
+
+exists (1:r0=1 /\ 1:r1=0)

@@ -1,0 +1,32 @@
+C mlink-kick-no-producer-mb
+
+(*
+ * Result: Sometimes
+ *
+ * BROKEN variant of mlink-kick (unsafe_no_mb on the producer): the
+ * store-release of prod does NOT order it before the later load of
+ * want_kick (release orders earlier accesses before the store, not the
+ * store before later loads). x86 TSO allows exactly this store->load
+ * reordering through the store buffer.
+ *)
+
+{}
+
+P0(int *prod, int *want_kick)
+{
+	int r0;
+
+	smp_store_release(prod, 1);
+	r0 = READ_ONCE(*want_kick);
+}
+
+P1(int *prod, int *want_kick)
+{
+	int r1;
+
+	WRITE_ONCE(*want_kick, 1);
+	smp_mb();
+	r1 = READ_ONCE(*prod);
+}
+
+exists (0:r0=0 /\ 1:r1=0)

@@ -31,11 +31,11 @@
 - [ ] P1.10 Study gate 1 passed (PCI, BARs, MSI-X, IRQ context, devm, teardown ordering)
 
 ## Phase 2: Shared-memory SPSC rings
-- [ ] P2.1 Define ring ABI (ctrl lines for prod/cons/flags on separate cache lines, desc array, slots) with static_asserts
-- [ ] P2.2 Implement ring ops with virt_* release/acquire, single-fetch length validation, corruption detection, kick-decision helpers
-- [ ] P2.3 Implement debugfs ring selftest (seq + payload pattern) reporting lost/dup/corrupt/ooo and msgs/s, with and without kick suppression
-- [ ] P2.4 Run the lost-wakeup experiment with `unsafe_no_mb=1` and record honest findings in debugging-log.md
-- [ ] P2.5 Write and run LKMM litmus tests (publish MP + kick SB) with herd7 (or web UI) and commit outputs
+- [x] P2.1 Define ring ABI (ctrl lines for prod/cons/flags on separate cache lines, desc array, slots) with static_asserts
+- [x] P2.2 Implement ring ops with virt_* release/acquire, single-fetch length validation, corruption detection, kick-decision helpers
+- [x] P2.3 Implement debugfs ring selftest (seq + payload pattern) reporting lost/dup/corrupt/ooo and msgs/s, with and without kick suppression
+- [x] P2.4 Run the lost-wakeup experiment with `unsafe_no_mb=1` and record honest findings in debugging-log.md
+- [x] P2.5 Write and run LKMM litmus tests (publish MP + kick SB) with herd7 (or web UI) and commit outputs
 - [ ] P2.6 Write `docs/walkthrough/phase2.md`
 - [ ] P2.7 Study gate 2 passed (memory ordering, release/acquire, SB race, untrusted shared memory, double fetch)
 
