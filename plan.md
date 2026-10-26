@@ -752,6 +752,11 @@ For each phase N:
   `scripts/host/msudo.sh` so the password never enters Claude's context; every root command
   logged to `logs/sudo.log` and reported to the user; allow/deny list in CLAUDE.md hard rule 3.
   Supersedes the "no sudo from Claude" part of D12.
+- **D15 (2026-10-27)** User: "don't stop, take the lead and continue … finish the project early
+  so we have time to study it". Claude implements phases back-to-back without waiting for the
+  P1.1 design review or per-phase study gates. Reviews and study gates are still required and
+  stay unticked in checkbox.md until the user does them (in batches, after implementation);
+  walkthrough docs are written per phase as before so the study material is ready.
 - **D14 (2026-10-27)** Guest kernel = **v6.18.59** (latest 6.18 longterm per kernel.org
   releases.json on 2026-10-27; 7.2.13 stable / 7.3 mainline not chosen — LTS for stable APIs).
   QEMU source 10.2.2, GPG signature verified (key CEACC9E15534EBABB82D3FA03353C9CEF108B584),

@@ -33,7 +33,19 @@ log() { echo "$(date -Is) $*" | tee -a "$LOG"; }
 setsid "$@" &
 PG=$!
 log "start pgid=$PG hot=$HOT cool=$COOL temp=$(temp)C: $*"
-# If we are killed, never leave the job frozen forever.
+# The job is in its own session (setsid), so a tmux kill / hangup does not
+# reach it. Forward termination to the whole group, or a "stopped" build keeps
+# running and races the next one on the same tree (seen 2026-10-27: fixdep
+# errors from two concurrent makes).
+stop_job() {
+	log "terminating job (signal)"
+	kill -TERM -- -"$PG" 2>/dev/null
+	kill -CONT -- -"$PG" 2>/dev/null
+	wait "$PG" 2>/dev/null
+	exit 143
+}
+trap stop_job HUP INT TERM
+# Never leave the job frozen forever.
 trap 'kill -CONT -- -$PG 2>/dev/null' EXIT
 
 frozen=0
