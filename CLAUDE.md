@@ -40,10 +40,17 @@ Phase 0 (environment & bootstrap) — not started. Planning files written 2026-1
    `~/D` or elsewhere. `sync.sh` must refuse to wipe unless the target is exactly `$HOME/D/mlink`
    and contains `.mlink-mirror`. On Windows, stay inside `D:\Projects\Embedded\mlink`, except
    `~/.ssh/config`, which you edit only after the user approves the exact block.
-3. **No sudo from Claude, and never ask for/accept the sudo password in chat.** Root steps go into
-   a script the user runs in their own terminal (e.g. `ssh -t ankit-kali@100.83.145.82 'sudo bash
-   ~/D/mlink/scripts/host/setup-root.sh'`). The only allowed passwordless call is
-   `sudo -n /usr/local/sbin/mlink-bench-prep`.
+3. **Sudo only via the askpass wrapper, password never seen** (user decision D13, 2026-10-27).
+   The user stores the password in `~/D/mlink-work/.secrets/sudo.pass` (0600) themselves. Claude
+   runs root commands ONLY as `bash ~/D/mlink/scripts/host/msudo.sh <cmd...>` (askpass + logs to
+   `~/D/mlink-work/logs/sudo.log`) and tells the user each time. Never `cat`/print/copy/grep the
+   password file, never pass the password on a command line, never ask for it in chat.
+   Allowed as root: `apt-get install` of project packages, rootfs image build/loop-mount inside
+   `~/D/mlink-work/images`, `chown`/perms inside the two project dirs, bench prep/restore,
+   running scripts from `scripts/host/`. **Never** as root: `apt remove/purge/upgrade/full-upgrade`
+   or kernel/bootloader changes, editing sudoers/PAM/sshd/network/firewall/Tailscale/systemd units
+   outside the project, reboot/shutdown, `insmod`/`modprobe` of anything (rule 1), anything that
+   touches files outside the allowed paths (rule 2). Unsure → don't, ask the user.
 4. Background processes on the laptop: you MAY stop Firefox, the `uvicorn` app and the Docker
    containers `dev-api-1`/`dev-db-1` for kernel builds and benchmarks. Tell the user when you do,
    and restart the Docker containers afterwards (`docker start dev-api-1 dev-db-1`). Do not

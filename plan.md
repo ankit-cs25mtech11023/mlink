@@ -81,8 +81,11 @@ software on two QEMU/KVM virtual machines that share memory:
 - Missing (installed in P0.4): flex, bison, bc, libelf-dev, libssl-dev, libglib2.0-dev,
   python3-venv, mmdebstrap/debootstrap, debian-archive-keyring, sparse, iperf3, trace-cmd,
   bpftrace, cpupower, **ivshmem-server** (not packaged by Debian/Kali — built in P0.6).
-- **sudo requires a password** → Claude cannot run sudo. The user runs the one-time root script
-  (P0.4) in their own terminal. A narrow NOPASSWD rule is added only for `mlink-bench-prep`.
+- **sudo requires a password.** The user runs the one-time root script (P0.4) in their own
+  terminal. Afterwards (D13) the user stores the password in `~/D/mlink-work/.secrets/sudo.pass`
+  (0600, never in git, never read by Claude) and Claude runs bounded root steps through
+  `scripts/host/msudo.sh` (`sudo -A` + askpass, every call logged). `mlink-bench-prep` keeps its
+  NOPASSWD rule.
 - Remote-safety already OK: sleep/suspend masked, lid switch ignored, `ssh` + `tailscaled`
   enabled at boot, no disk encryption, on AC.
 - Background load seen: Firefox (+extension at ~87% CPU), `uvicorn` (~1.8 GB RSS), Docker
@@ -141,8 +144,8 @@ Laptop   ~/D/mlink/                            ← DISPOSABLE mirror, wiped + re
   DL, Documents, IPACO, Leetcode, Misc, NS, decks…) and the rest of the system is never deleted,
   moved or overwritten. `sync.sh` wipes `~/D/mlink` only if it contains the marker file
   `.mlink-mirror` and the path resolves exactly to `$HOME/D/mlink` (refuses otherwise).
-- **Never ask for or accept the sudo password in chat.** Root steps are run by the user in their
-  own terminal (P0.4); the only passwordless rule is for `/usr/local/sbin/mlink-bench-prep`.
+- **Never ask for or accept the sudo password in chat.** Root steps go through `msudo.sh`
+  (askpass from the user-written password file, logged, bounded by CLAUDE.md hard rule 3).
 - Every non-trivial bug that takes > 30 min goes into `docs/debugging-log.md`
   (symptom → hypothesis → evidence → root cause → fix). These become interview stories.
 - **Timebox rule:** stuck > 2 h on one problem → apply the documented fallback for that step,
@@ -736,6 +739,12 @@ For each phase N:
   (restart Docker containers afterwards).
 - **D12** Hard file-safety boundary on the laptop (only `~/D/mlink`, `~/D/mlink-work`,
   `/dev/shm/mlink-shm`); sudo password never goes through chat — user runs root steps.
+- **D13 (2026-10-27)** User chose to let Claude use sudo so work is not blocked while they are
+  away. Mitigations: password file written by the user on the laptop only
+  (`~/D/mlink-work/.secrets/sudo.pass`, 0600), used solely via `sudo -A` askpass in
+  `scripts/host/msudo.sh` so the password never enters Claude's context; every root command
+  logged to `logs/sudo.log` and reported to the user; allow/deny list in CLAUDE.md hard rule 3.
+  Supersedes the "no sudo from Claude" part of D12.
 - *(P0.5: record exact kernel tag here)*
 
 ## 12. Notes & references
