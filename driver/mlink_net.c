@@ -11,6 +11,7 @@
 #include <linux/u64_stats_sync.h>
 
 #include "mlink.h"
+#include "mlink_trace.h"
 
 #define MLINK_MIN_MTU	68
 #define MLINK_MAX_MTU	MLINK_SLOT_SIZE
@@ -88,13 +89,17 @@ static netdev_tx_t mlink_start_xmit(struct sk_buff *skb, struct net_device *ndev
 	}
 
 	/* More packets coming right now: one kick for the whole batch. */
-	if (netdev_xmit_more() && !netif_queue_stopped(ndev))
+	if (netdev_xmit_more() && !netif_queue_stopped(ndev)) {
+		trace_mlink_xmit(len, r->idx, false);
 		return NETDEV_TX_OK;
+	}
 	if (!kick_suppress || mlink_ring_need_kick(r, safe)) {
 		mlink_kick(mdev, MLINK_VEC_DATA);
 		mdev->stats.tx_kicks++;
+		trace_mlink_xmit(len, r->idx, true);
 	} else {
 		mdev->stats.tx_kick_suppressed++;
+		trace_mlink_xmit(len, r->idx, false);
 	}
 	return NETDEV_TX_OK;
 }
@@ -126,6 +131,7 @@ void mlink_net_rx(struct mlink_dev *mdev, const struct mlink_rx_desc *d)
 	if (unlikely(!skb))
 		goto drop;
 	skb_put_data(skb, d->data, d->len);
+	trace_mlink_rx(d->len, d->proto, mdev->rx.idx);
 
 	/* Classify from our private copy, never from shm (no double fetch). */
 	ver = skb->data[0] >> 4;
@@ -161,6 +167,7 @@ static int mlink_napi_poll(struct napi_struct *napi, int budget)
 
 	mdev->stats.napi_polls++;
 	done = mlink_rx_poll(mdev, budget);
+	trace_mlink_napi_poll(budget, done);
 	if (done == budget) {
 		mdev->stats.napi_budget_exhausted++;
 		return budget;	/* stay scheduled; the core polls us again */

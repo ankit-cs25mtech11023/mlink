@@ -18,6 +18,9 @@
 
 #include "mlink.h"
 
+#define CREATE_TRACE_POINTS
+#include "mlink_trace.h"
+
 #define MLINK_PCI_DEVICE_ID	0x1110	/* QEMU ivshmem */
 
 static char *role;
@@ -38,6 +41,7 @@ void mlink_kick(struct mlink_dev *mdev, enum mlink_vector vec)
 {
 	u32 peer = READ_ONCE(mdev->peer_id);
 
+	trace_mlink_kick(peer, vec);
 	/* QEMU signals eventfd[vec] of peer 'peer'; its QEMU raises MSI-X vector vec. */
 	iowrite32((peer << 16) | vec, mdev->regs + IVSHMEM_DOORBELL);
 }
@@ -61,6 +65,7 @@ static irqreturn_t mlink_data_irq(int irq, void *data)
 	struct mlink_dev *mdev = data;
 
 	atomic_long_inc(&mdev->irq_count[MLINK_VEC_DATA]);
+	trace_mlink_irq(MLINK_VEC_DATA);
 	if (!READ_ONCE(mdev->ready))
 		return IRQ_HANDLED;
 	/* We are about to poll: further kicks would be wasted interrupts. */
@@ -74,6 +79,7 @@ static irqreturn_t mlink_space_irq(int irq, void *data)
 	struct mlink_dev *mdev = data;
 
 	atomic_long_inc(&mdev->irq_count[MLINK_VEC_SPACE]);
+	trace_mlink_irq(MLINK_VEC_SPACE);
 	if (!READ_ONCE(mdev->ready))
 		return IRQ_HANDLED;
 	mlink_net_space(mdev);
@@ -87,6 +93,7 @@ static irqreturn_t mlink_state_irq(int irq, void *data)
 	struct mlink_dev *mdev = data;
 
 	atomic_long_inc(&mdev->irq_count[MLINK_VEC_STATE]);
+	trace_mlink_irq(MLINK_VEC_STATE);
 	return IRQ_HANDLED;
 }
 
@@ -96,6 +103,7 @@ static irqreturn_t mlink_test_irq(int irq, void *data)
 	u64 now = ktime_get_ns();	/* first thing: this is the RTT end point */
 
 	atomic_long_inc(&mdev->irq_count[MLINK_VEC_TEST]);
+	trace_mlink_irq(MLINK_VEC_TEST);
 	if (!READ_ONCE(mdev->ready))
 		return IRQ_HANDLED;
 

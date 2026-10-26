@@ -45,10 +45,10 @@
 - [x] P3.3 Implement RX path with NAPI (vector-0 IRQ → napi_schedule, budgeted poll, protocol from IP nibble, GRO, complete+re-arm+re-check)
 - [x] P3.4 Implement SPACE vector handling to wake the TX queue
 - [x] P3.5 Add stats64 with u64_stats_sync and ethtool ops (drvinfo, link, ringparam, `ethtool -S` driver counters)
-- [ ] P3.6 Add TRACE_EVENT tracepoints (xmit, kick, irq, napi_poll, rx)
+- [x] P3.6 Add TRACE_EVENT tracepoints (xmit, kick, irq, napi_poll, rx)
 - [x] P3.7 Bring-up script + verify ping, tcpdump, iperf3 TCP/UDP/reverse/parallel both ways, counters consistent, route via mlink0
 - [ ] P3.8 Pass 10-minute bidirectional soak with ping flood and link flaps (no watchdog timeouts, dmesg gate clean)
-- [ ] P3.9 Complete `scripts/win/test.sh` end-to-end smoke test (sync→build→load→ping→iperf3→unload→dmesg gate)
+- [x] P3.9 Complete `scripts/win/test.sh` end-to-end smoke test (sync→build→load→ping→iperf3→unload→dmesg gate)
 - [ ] P3.10 Record first throughput and RTT numbers (debug kernel, labeled)
 - [ ] P3.11 Write `docs/walkthrough/phase3.md`
 - [ ] P3.12 Study gate 3 passed (net_device, sk_buff, NAPI, softirq context, queue stop/wake, GRO) — minimum resume bullet unlocked

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-2.0-only
 #
-# Smoke test, run after every driver change:
-# build + stage -> (re)load in both guests -> wait for peer discovery ->
-# doorbell ping-pong -> unload -> dmesg gate -> PASS/FAIL.
-# P3.9 extends it with link-up, ping and iperf3.
+# Smoke test, run after every driver change (P3.9):
+# build + stage -> (re)load + mlink0 up in both guests -> peer discovery ->
+# doorbell ping-pong -> ping 100 -> iperf3 TCP 5 s -> counters -> unload ->
+# dmesg gate -> PASS/FAIL.
 #
 # Usage (Git Bash): bash scripts/win/test.sh
 set -uo pipefail
@@ -21,7 +21,7 @@ bash "$REPO/scripts/win/rbuild.sh" >/dev/null || { echo "TEST: FAIL (build)"; ex
 echo "build: ok"
 
 for vm in ap modem; do
-	g "$vm" "echo $MARK > /dev/kmsg; if lsmod | grep -q '^mlink '; then rmmod mlink; fi; insmod /mnt/share/mlink.ko role=$vm" ||
+	g "$vm" "echo $MARK > /dev/kmsg; bash /mnt/share/mlink-down.sh >/dev/null; bash /mnt/share/mlink-up.sh $vm >/dev/null" ||
 		{ echo "load $vm: FAIL"; fail=1; }
 done
 
@@ -38,8 +38,24 @@ pp=$(g ap "echo 200 > $D/pingpong && cat $D/pingpong")
 echo "pingpong: $pp"
 case "$pp" in *"count 200 lost 0"*) ;; *) fail=1 ;; esac
 
+p=$(g ap "ping -c 100 -i 0.01 -q 10.77.0.2 | grep -o '[0-9]*% packet loss'")
+echo "ping: $p"
+[ "$p" = "0% packet loss" ] || fail=1
+
+g modem "pkill iperf3; iperf3 -s -D -1" >/dev/null
+sleep 0.5
+bw=$(g ap "iperf3 -c 10.77.0.2 -t 5 -f m | grep receiver | awk '{print \$7, \$8}'")
+echo "iperf3 TCP 5s: $bw"
+[ -n "$bw" ] || fail=1
+
+for vm in ap modem; do
+	c=$(g "$vm" "ethtool -S mlink0 | grep -E 'rx_stalls|ring_corruptions|rx_len_errors' | awk '{s+=\$2} END {print s}'")
+	echo "error counters $vm: $c"
+	[ "$c" = 0 ] || fail=1
+done
+
 for vm in modem ap; do
-	g "$vm" "rmmod mlink" || { echo "unload $vm: FAIL"; fail=1; }
+	g "$vm" "bash /mnt/share/mlink-down.sh" >/dev/null || { echo "unload $vm: FAIL"; fail=1; }
 done
 for vm in ap modem; do
 	g "$vm" "bash /mnt/share/dmesg-gate.sh $MARK" || fail=1

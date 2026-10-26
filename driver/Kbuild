@@ -4,3 +4,5 @@ mlink-y := mlink_main.o mlink_debugfs.o mlink_ring.o mlink_selftest.o mlink_net.
 
 # Kernel APIs change between releases; turn every warning into a build failure.
 ccflags-y += -Werror
+# mlink_trace.h is included via TRACE_INCLUDE_PATH "." relative to $(src).
+ccflags-y += -I$(src)
