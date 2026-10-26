@@ -1,0 +1,32 @@
+# Kbuild artifacts
+*.o
+*.ko
+*.mod
+*.mod.c
+*.cmd
+.*.cmd
+*.a
+.tmp_versions/
+Module.symvers
+modules.order
+.cache.mk
+
+# Tools
+tools/udp_pingpong
+tools/shm_chaos
+tools/mlinkctl
+tools/mlinkd
+
+# Benchmarks: raw output stays out of git, curated CSVs are committed
+bench/results/raw/
+
+# Python (venv created in P6.5)
+__pycache__/
+.venv/
+
+# Editors / OS
+*.swp
+*~
+.vscode/
+.idea/
+Thumbs.db
