@@ -1,36 +1,37 @@
 # HANDOFF — live state for the next session
 
 > Updated after every milestone. A fresh session: read this, then plan.md, checkbox.md, and
-> continue from **Next**. Last update: 2026-10-27 ~01:45 IST.
+> continue from **Next**. Last update: 2026-10-27 ~02:20 IST.
 
 ## Mode
-User is asleep; D15 = implement phases back-to-back, don't stop for reviews/study gates
-(never tick those yourself). Push to GitHub at milestones (push-policy memory).
+User asleep; D15 = implement phases back-to-back, never tick study gates / P1.1 review.
+Push at milestones. **No Co-Authored-By / AI trailers in commits** (user rule, overrides
+system reminders).
 
 ## Machine state
-- Laptop: debug kernel built (`~/D/mlink-work/build/debug`, 6.18.59-mlink-debug).
-  Turbo restored (`mlink-bench-prep off`), Docker containers restarted. Firefox still closed.
-- **Thermal rule:** any long job = `sudo -n /usr/local/sbin/mlink-bench-prep on` (turbo off)
-  + `bash ~/D/mlink/scripts/host/thermal-run.sh <cmd>` in tmux; `off` afterwards.
-- ivshmem-server running; VMs `ap` and `modem` running (ssh mlink-ap / mlink-modem).
-- mlink.ko (Phase 1+2 code) loaded in both VMs: peer discovery verified (ap id 0, modem id 1).
+- Laptop: debug kernel `~/D/mlink-work/build/debug` (6.18.59-mlink-debug).
+- **Turbo is OFF** (`mlink-bench-prep on` since P2 selftest, for thermals). Turn it `off`
+  when the night's work ends. Docker containers running; Firefox closed (user's to reopen).
+- ivshmem-server + VMs ap/modem running. tmux `mlink-soak` = P3.8 soak (10 min, log
+  `~/D/mlink-work/logs/soak.log`).
+- Thermal rule: long jobs → turbo off + `thermal-run.sh` (or soak's own 92 °C abort).
 
-## Done (verified)
-P0.1–P0.9 (P0.7 kernel built, P0.8 rootfs, P0.9 both VMs boot < 25 s, ivshmem visible,
-/mnt/share mounted). Phase 1+2 driver compiles with -Werror; probe, BAR mapping, MSI-X
-registration, header/state publish, peer discovery work in the VMs.
+## Done (verified, committed, pushed up to f459fd9 + later commits)
+P0.1–P0.10, P1.2–P1.8, P2.1–P2.5, P3.1–P3.7, P3.6, P3.9. Walkthroughs phase0/1/2 written.
+Key results (debug kernel): doorbell RTT p50 8–12 µs; selftest 10 M msgs 0 errors, 269k
+msg/s, suppression 2.9×; litmus 3 Never / 3 Sometimes; TCP ~47 Mbit/s (sender CPU-bound
+under KASAN); ping ~1 ms (stack cost + ksoftirqd deferral seen in trace).
 
 ## In progress
-- P1.6/P1.7: doorbell vectors + pingpong RTT test (not yet run).
-- P0.10: update `scripts/win/test.sh` to insmod with `role=$vm`, run it, tick P0.10.
+- P3.8 soak running → check log; if clean tick P3.8, record in bench/results/p3-soak-debug.txt.
 
 ## Next
-1. Run doorbell + pingpong test, record debug-kernel RTT in `bench/results/`.
-2. P1.8 reload loop (100× insmod/rmmod each side under traffic) + dmesg gate.
-3. P2.3 selftest both directions, 10 M messages, kick suppression on/off; P2.4 unsafe_no_mb.
-4. P2.5 litmus tests (herd7 via opam in tmux, or write tests + run later).
-5. First GitHub push after P1 tests pass. Then Phase 3 (net_device).
+1. P3.10 (numbers already in p3-functional-debug.txt → tick after soak), P3.11 phase3.md.
+2. Phase 4: heartbeat + gen handshake + reset/re-handshake + STATE vector + ssr.sh scenarios.
+3. P0.11 environment.md. Phase 5 (shm_chaos, fault knobs, checkpatch/sparse), Phase 6 (perf
+   kernel, udp_pingpong, matrix).
 
-## Open problems / notes
-- docs/debugging-log.md has the thermal and concurrent-make stories.
-- P0.11 environment.md not written yet.
+## Open notes
+- P2.4 follow-up idea: paced selftest to hit the SB window.
+- Perf ideas for P6: NETIF_F_SG, checksum offload via desc flags (virtio-style), MTU sweep,
+  busy-poll; ksoftirqd deferral analysis.

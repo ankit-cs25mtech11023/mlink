@@ -15,7 +15,7 @@
 - [x] P0.8 Build Debian trixie rootfs with mmdebstrap (ssh keys, 9p fstab, networkd for virtio NIC) and create ap/modem qcow2 overlays
 - [x] P0.9 Boot both VMs via `ivshmem.sh` + `vm.sh`; ssh from Windows via aliases; ivshmem 1af4:1110 visible in both; /mnt/share mounted
 - [x] P0.10 Hello-module loop working (rbuild.sh sync→build→stage, insmod/rmmod in guest), plus dmesg-gate.sh and test.sh skeleton
-- [ ] P0.11 Write `docs/environment.md` (rebuild from zero) and `docs/walkthrough/phase0.md`
+- [x] P0.11 Write `docs/environment.md` (rebuild from zero) and `docs/walkthrough/phase0.md`
 - [ ] P0.12 Study gate 0 passed (QEMU/KVM/9p/Kbuild/vermagic quiz)
 
 ## Phase 1: PCI driver & doorbell interrupts
@@ -27,7 +27,7 @@
 - [x] P1.6 Add debugfs: info, irq_counts, ring_doorbell, and in-kernel doorbell ping-pong RTT histogram
 - [x] P1.7 Record first doorbell RTT histogram (debug kernel, labeled) in bench/results
 - [x] P1.8 Pass 100× insmod/rmmod loop on each side under traffic with KASAN/lockdep clean and correct teardown order
-- [ ] P1.9 Write `docs/walkthrough/phase1.md`
+- [x] P1.9 Write `docs/walkthrough/phase1.md`
 - [ ] P1.10 Study gate 1 passed (PCI, BARs, MSI-X, IRQ context, devm, teardown ordering)
 
 ## Phase 2: Shared-memory SPSC rings
@@ -36,7 +36,7 @@
 - [x] P2.3 Implement debugfs ring selftest (seq + payload pattern) reporting lost/dup/corrupt/ooo and msgs/s, with and without kick suppression
 - [x] P2.4 Run the lost-wakeup experiment with `unsafe_no_mb=1` and record honest findings in debugging-log.md
 - [x] P2.5 Write and run LKMM litmus tests (publish MP + kick SB) with herd7 (or web UI) and commit outputs
-- [ ] P2.6 Write `docs/walkthrough/phase2.md`
+- [x] P2.6 Write `docs/walkthrough/phase2.md`
 - [ ] P2.7 Study gate 2 passed (memory ordering, release/acquire, SB race, untrusted shared memory, double fetch)
 
 ## Phase 3: Network device data path ★
