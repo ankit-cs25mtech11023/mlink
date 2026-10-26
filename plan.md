@@ -388,6 +388,11 @@ Every phase ends with: walkthrough doc → study gate → commit (+ push once re
   - Stuck: BTF/pahole errors → check pahole version vs kernel requirement; worst case disable
     DEBUG_INFO_BTF in debug build (bpftrace then needs kernel headers; use trace-cmd instead).
   - Stuck: out of memory during link → `-j4`, ensure swap, stop background apps.
+  - **Thermals (measured 2026-10-27):** with turbo on, `-j3..-j6` spikes to 96–97 °C within
+    seconds; the B0D4 zone's critical trip (kernel power-off) is 98 °C. Rule: long jobs run
+    with turbo off (`sudo -n mlink-bench-prep on`, `off` afterwards) and under
+    `scripts/host/thermal-run.sh` (SIGSTOP the job's process group ≥ 88 °C, SIGCONT ≤ 78 °C).
+    Turbo off + `-j6` holds ~70 °C.
   - Stuck: gcc 15 warnings-as-errors in kernel → build with `WERROR=0`/`CONFIG_WERROR=n`.
 - **P0.8 Rootfs** (`mkrootfs.sh`, needs the user's sudo run OR mmdebstrap unshare mode —
   try unshare first, no sudo): `mmdebstrap --mode=unshare --variant=minbase
@@ -718,6 +723,7 @@ For each phase N:
 | R11 | Kernel API churn (pcim_*, netif_napi_add*, etc.) | M | always check the chosen tree's headers; compile warnings are errors in our Makefile (`ccflags-y += -Werror`) |
 | R12 | Benchmarks noisy (thermal throttling, shared laptop) | H | hygiene script, pinning, repetitions, medians, report variance & caveats honestly |
 | R13 | Interview: "it's just emulation" | M | answer: real PCI/IRQ/netdev APIs, only the device is virtual; P11 real HW stretch |
+| R15 | Laptop thermal shutdown (98 °C trip) during builds/soaks → remote lockout | H (measured) | turbo off + `thermal-run.sh` guard for every long job; check `thermal.log` |
 | R14 | CRLF line endings break scripts/Kbuild | M | `.gitattributes eol=lf`, `core.autocrlf false`, sync script sanity check (`file` on scripts) |
 
 ## 11. Key decisions (log — newest at bottom)
