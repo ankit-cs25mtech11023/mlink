@@ -46,6 +46,8 @@ EOF
 B64=$(printf '%s' "$REMOTE" | base64 -w0)
 
 # Tracked + new untracked files, honouring .gitignore; never ship .git itself.
+# Skip files deleted in the working tree but still in the index.
 git ls-files -co --exclude-standard -z |
+	while IFS= read -r -d '' f; do [ -e "$f" ] && printf '%s\0' "$f"; done |
 	tar --null -T - -cf - |
 	ssh -o BatchMode=yes "$HOST" "bash -c \"\$(echo $B64 | base64 -d)\""

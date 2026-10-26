@@ -7,8 +7,10 @@
 #include <linux/completion.h>
 #include <linux/mutex.h>
 #include <linux/pci.h>
+#include <linux/wait.h>
 #include <linux/workqueue.h>
 
+#include "mlink_ring.h"
 #include "mlink_shm.h"
 
 /* ivshmem-doorbell BAR0 registers */
@@ -18,6 +20,11 @@
 #define IVSHMEM_DOORBELL	0x0c
 
 #define MLINK_PEER_POLL_MS	100
+#define MLINK_RX_BUDGET		64
+
+/* Module parameters (mlink_main.c) */
+extern bool kick_suppress;
+extern bool unsafe_no_mb;
 
 enum mlink_role {
 	MLINK_ROLE_AP,
@@ -32,6 +39,38 @@ struct mlink_pingpong {
 	/* results of the last run */
 	u32 count, lost;
 	u64 min, p50, p90, p99, max;
+};
+
+/*
+ * Driver counters. Each is written from one context only (noted), read
+ * racily by debugfs; that is fine for statistics.
+ */
+struct mlink_stats {
+	u64 tx_kicks;			/* producer: DATA kicks sent */
+	u64 tx_kick_suppressed;		/* producer: publish without kick */
+	u64 tx_space_waits;		/* producer: ring was full */
+	u64 tx_lost_space_wakeups;	/* producer: space appeared, no SPACE irq */
+	u64 tx_space_timeouts;		/* producer: no space for a whole timeout */
+	u64 rx_msgs;			/* consumer work */
+	u64 rx_len_errors;		/* consumer work: invalid desc len */
+	u64 rx_proto_errors;		/* consumer work: unknown proto */
+	u64 rx_stalls;			/* link work: armed but data waiting (lost DATA kick) */
+	u64 space_kicks;		/* consumer work: SPACE kicks sent */
+	u64 ring_corruptions;		/* impossible prod/cons seen */
+};
+
+/* Ring selftest (P2.3): sequence-numbered pseudo-random payloads. */
+struct mlink_selftest {
+	struct mutex lock;		/* one TX run at a time */
+	/* last TX run */
+	u32 tx_sent;
+	int tx_err;
+	u64 tx_ns;
+	u64 tx_kicks, tx_suppressed, tx_space_waits, tx_lost_wakeups;
+	/* RX verifier state (consumer work only) */
+	u32 rx_expect;
+	u64 rx_ok, rx_lost, rx_dup_ooo, rx_corrupt;
+	u64 rx_first_ns, rx_last_ns;
 };
 
 struct mlink_dev {
@@ -51,9 +90,18 @@ struct mlink_dev {
 	bool peer_found;
 	bool dying;			/* set first in remove(); irq handlers check it */
 
+	struct mlink_ring tx;		/* we produce */
+	struct mlink_ring rx;		/* we consume */
+	bool rx_broken;			/* corruption seen; stop consuming (P4 resets) */
+	u32 rx_stall_seen;		/* link work: consecutive "armed but pending" polls */
+	struct work_struct rx_work;	/* consumer (becomes NAPI poll in P3) */
+	wait_queue_head_t tx_wq;	/* woken by the SPACE irq */
+
 	struct delayed_work link_work;	/* peer discovery, later heartbeat (P4) */
 	atomic_long_t irq_count[MLINK_NR_VECTORS];
+	struct mlink_stats stats;
 	struct mlink_pingpong pp;
+	struct mlink_selftest st;
 	struct dentry *dbg;
 };
 
@@ -61,6 +109,11 @@ void mlink_kick(struct mlink_dev *mdev, enum mlink_vector vec);
 int mlink_pingpong_run(struct mlink_dev *mdev, u32 n);
 void mlink_debugfs_init(struct mlink_dev *mdev);
 void mlink_debugfs_exit(struct mlink_dev *mdev);
+
+/* mlink_selftest.c: ring consumer + selftest */
+void mlink_rx_work(struct work_struct *work);
+int mlink_rx_poll(struct mlink_dev *mdev, int budget);
+int mlink_selftest_tx(struct mlink_dev *mdev, u32 n);
 
 static inline const char *mlink_role_name(enum mlink_role role)
 {

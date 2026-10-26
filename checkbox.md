@@ -12,20 +12,20 @@
 - [x] P0.5 Fetch kernel LTS source (shallow) and QEMU 10.2.2 tarball; record exact kernel tag in plan.md Key Decisions
 - [x] P0.6 Build `ivshmem-server` from QEMU source (or fallback: write `ivshmem-lite-server.c`) and verify socket + `/dev/shm/mlink-shm`
 - [ ] P0.7 Write kernel config fragments and build the debug kernel (KASAN, lockdep, BTF) in tmux; verify options landed in `.config`
-- [ ] P0.8 Build Debian trixie rootfs with mmdebstrap (ssh keys, 9p fstab, networkd for virtio NIC) and create ap/modem qcow2 overlays
-- [ ] P0.9 Boot both VMs via `ivshmem.sh` + `vm.sh`; ssh from Windows via aliases; ivshmem 1af4:1110 visible in both; /mnt/share mounted
-- [ ] P0.10 Hello-module loop working (rbuild.sh sync→build→stage, insmod/rmmod in guest), plus dmesg-gate.sh and test.sh skeleton
+- [x] P0.8 Build Debian trixie rootfs with mmdebstrap (ssh keys, 9p fstab, networkd for virtio NIC) and create ap/modem qcow2 overlays
+- [x] P0.9 Boot both VMs via `ivshmem.sh` + `vm.sh`; ssh from Windows via aliases; ivshmem 1af4:1110 visible in both; /mnt/share mounted
+- [x] P0.10 Hello-module loop working (rbuild.sh sync→build→stage, insmod/rmmod in guest), plus dmesg-gate.sh and test.sh skeleton
 - [ ] P0.11 Write `docs/environment.md` (rebuild from zero) and `docs/walkthrough/phase0.md`
 - [ ] P0.12 Study gate 0 passed (QEMU/KVM/9p/Kbuild/vermagic quiz)
 
 ## Phase 1: PCI driver & doorbell interrupts
 - [ ] P1.1 Write `docs/design.md` v1 (shm layout, roles, vectors, single-writer table) and get user review
-- [ ] P1.2 Write `mlink_shm.h` v1 (header + state blocks, cacheline padding, static_asserts on offsets)
-- [ ] P1.3 Implement PCI probe/remove: enable device, map BAR0 (current pcim API) and BAR2 (memremap WB), read IVPosition, validate `role` param
-- [ ] P1.4 Allocate 4 MSI-X vectors and register per-vector IRQ handlers visible in /proc/interrupts (INTx fallback only if blocked)
-- [ ] P1.5 Implement peer discovery through state blocks (publish own peer_id + magic, poll for peer)
-- [ ] P1.6 Add debugfs: info, irq_counts, ring_doorbell, and in-kernel doorbell ping-pong RTT histogram
-- [ ] P1.7 Record first doorbell RTT histogram (debug kernel, labeled) in bench/results
+- [x] P1.2 Write `mlink_shm.h` v1 (header + state blocks, cacheline padding, static_asserts on offsets)
+- [x] P1.3 Implement PCI probe/remove: enable device, map BAR0 (current pcim API) and BAR2 (memremap WB), read IVPosition, validate `role` param
+- [x] P1.4 Allocate 4 MSI-X vectors and register per-vector IRQ handlers visible in /proc/interrupts (INTx fallback only if blocked)
+- [x] P1.5 Implement peer discovery through state blocks (publish own peer_id + magic, poll for peer)
+- [x] P1.6 Add debugfs: info, irq_counts, ring_doorbell, and in-kernel doorbell ping-pong RTT histogram
+- [x] P1.7 Record first doorbell RTT histogram (debug kernel, labeled) in bench/results
 - [ ] P1.8 Pass 100× insmod/rmmod loop on each side under traffic with KASAN/lockdep clean and correct teardown order
 - [ ] P1.9 Write `docs/walkthrough/phase1.md`
 - [ ] P1.10 Study gate 1 passed (PCI, BARs, MSI-X, IRQ context, devm, teardown ordering)

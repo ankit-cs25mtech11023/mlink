@@ -1,0 +1,9 @@
+# P1.7 doorbell RTT — DEBUG kernel (KASAN+lockdep), NOT a headline number
+# date: 2026-10-27T01:36:51+05:30
+# kernel: 6.18.59-mlink-debug
+# host: i5-8250U laptop, turbo ON, powersave governor, Docker running, no pinning
+# command (on ap): echo 5000 > /sys/kernel/debug/mlink/pingpong; cat /sys/kernel/debug/mlink/pingpong
+# method: AP kicks TEST vector, modem reflects from hard-irq, RTT = AP irq ktime - send ktime
+count 5000 lost 0 min_ns 7886 p50_ns 8246 p90_ns 11122 p99_ns 15736 max_ns 506885
+count 5000 lost 0 min_ns 7794 p50_ns 8284 p90_ns 12208 p99_ns 16564 max_ns 488562
+count 5000 lost 0 min_ns 7953 p50_ns 12559 p90_ns 13706 p99_ns 25893 max_ns 98376

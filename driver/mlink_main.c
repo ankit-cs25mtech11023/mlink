@@ -23,6 +23,14 @@ static char *role;
 module_param(role, charp, 0444);
 MODULE_PARM_DESC(role, "Link side: \"ap\" or \"modem\" (required)");
 
+bool kick_suppress = true;
+module_param(kick_suppress, bool, 0644);
+MODULE_PARM_DESC(kick_suppress, "Kick the peer only when it asked for it (default on)");
+
+bool unsafe_no_mb;
+module_param(unsafe_no_mb, bool, 0644);
+MODULE_PARM_DESC(unsafe_no_mb, "EXPERIMENT ONLY: drop the kick-path full barriers (P2.4)");
+
 static enum mlink_role mlink_role;
 
 void mlink_kick(struct mlink_dev *mdev, enum mlink_vector vec)
@@ -41,16 +49,29 @@ static irqreturn_t mlink_count_irq(struct mlink_dev *mdev, enum mlink_vector vec
 	return IRQ_HANDLED;
 }
 
-/* DATA/SPACE/STATE only count in Phase 1; NAPI and link handling come later. */
 static irqreturn_t mlink_data_irq(int irq, void *data)
 {
-	return mlink_count_irq(data, MLINK_VEC_DATA);
+	struct mlink_dev *mdev = data;
+
+	mlink_count_irq(mdev, MLINK_VEC_DATA);
+	if (READ_ONCE(mdev->dying))
+		return IRQ_HANDLED;
+	/* We are about to poll: further kicks would be wasted interrupts. */
+	mlink_ring_disarm_kick(&mdev->rx);
+	queue_work(system_highpri_wq, &mdev->rx_work);
+	return IRQ_HANDLED;
 }
 
 static irqreturn_t mlink_space_irq(int irq, void *data)
 {
-	return mlink_count_irq(data, MLINK_VEC_SPACE);
+	struct mlink_dev *mdev = data;
+
+	mlink_count_irq(mdev, MLINK_VEC_SPACE);
+	wake_up(&mdev->tx_wq);
+	return IRQ_HANDLED;
 }
+
+/* STATE only counts until the link state machine (P4). */
 
 static irqreturn_t mlink_state_irq(int irq, void *data)
 {
@@ -194,6 +215,23 @@ static void mlink_link_work(struct work_struct *work)
 		dev_info(dev, "peer gone\n");
 	}
 
+	/*
+	 * Watchdog for lost DATA kicks: kick armed yet data waiting on two
+	 * consecutive polls (>= 100 ms) means a wakeup was lost. Count it and
+	 * recover, so a missing barrier shows up as a number, not a hang.
+	 */
+	if (!READ_ONCE(mdev->rx_broken) && mlink_ring_kick_armed(&mdev->rx) &&
+	    mlink_ring_pending(&mdev->rx)) {
+		if (++mdev->rx_stall_seen >= 2) {
+			mdev->stats.rx_stalls++;
+			mdev->rx_stall_seen = 0;
+			mlink_ring_disarm_kick(&mdev->rx);
+			queue_work(system_highpri_wq, &mdev->rx_work);
+		}
+	} else {
+		mdev->rx_stall_seen = 0;
+	}
+
 again:
 	if (!READ_ONCE(mdev->dying))
 		schedule_delayed_work(&mdev->link_work,
@@ -216,6 +254,9 @@ static int mlink_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	mdev->role = mlink_role;
 	mutex_init(&mdev->pp.lock);
 	init_completion(&mdev->pp.done);
+	mutex_init(&mdev->st.lock);
+	init_waitqueue_head(&mdev->tx_wq);
+	INIT_WORK(&mdev->rx_work, mlink_rx_work);
 	INIT_DELAYED_WORK(&mdev->link_work, mlink_link_work);
 
 	ret = pcim_enable_device(pdev);
@@ -248,6 +289,15 @@ static int mlink_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	mdev->peer = mdev->role == MLINK_ROLE_AP ? modem_st : ap_st;
 	mdev->own_id = ioread32(mdev->regs + IVSHMEM_IVPOSITION);
 
+	/* Ring A carries AP -> MODEM, ring B MODEM -> AP. */
+	if (mdev->role == MLINK_ROLE_AP) {
+		mlink_ring_attach(&mdev->tx, mdev->shm + MLINK_RING_A_OFF, true);
+		mlink_ring_attach(&mdev->rx, mdev->shm + MLINK_RING_B_OFF, false);
+	} else {
+		mlink_ring_attach(&mdev->tx, mdev->shm + MLINK_RING_B_OFF, true);
+		mlink_ring_attach(&mdev->rx, mdev->shm + MLINK_RING_A_OFF, false);
+	}
+
 	ret = pci_alloc_irq_vectors(pdev, MLINK_NR_VECTORS, MLINK_NR_VECTORS,
 				    PCI_IRQ_MSIX);
 	if (ret < 0)
@@ -274,6 +324,8 @@ static int mlink_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		mlink_state_publish(mdev, MLINK_ST_WAIT_PEER);
 
 	mlink_debugfs_init(mdev);
+	/* First consumer pass drains anything pending and arms the DATA kick. */
+	queue_work(system_highpri_wq, &mdev->rx_work);
 	schedule_delayed_work(&mdev->link_work, 0);
 
 	dev_info(dev, "role=%s own_id=%u gen=%u shm=%pa bytes\n",
@@ -289,7 +341,8 @@ static void mlink_remove(struct pci_dev *pdev)
 
 	/* Teardown order: stop producers of work -> tell the peer -> quiesce irqs. */
 	WRITE_ONCE(mdev->dying, true);
-	mlink_debugfs_exit(mdev);	/* waits for a running pingpong to return */
+	wake_up(&mdev->tx_wq);		/* a selftest waiting for space bails out */
+	mlink_debugfs_exit(mdev);	/* waits for running pingpong/selftest */
 	cancel_delayed_work_sync(&mdev->link_work);
 
 	WRITE_ONCE(mdev->self->state, MLINK_ST_DOWN);
@@ -301,6 +354,8 @@ static void mlink_remove(struct pci_dev *pdev)
 	 */
 	for (i = 0; i < MLINK_NR_VECTORS; i++)
 		devm_free_irq(&pdev->dev, pci_irq_vector(pdev, i), mdev);
+	/* After the irqs (which queue it) and the link work (which may too). */
+	cancel_work_sync(&mdev->rx_work);
 	dev_info(&pdev->dev, "removed\n");
 }
 

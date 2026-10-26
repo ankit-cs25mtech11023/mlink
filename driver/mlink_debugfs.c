@@ -7,7 +7,9 @@
  *   pingpong       AP: write N -> N TEST round trips; read -> RTT stats (ns)
  */
 #include <linux/debugfs.h>
+#include <linux/delay.h>
 #include <linux/kstrtox.h>
+#include <linux/math64.h>
 #include <linux/ktime.h>
 #include <linux/seq_file.h>
 #include <linux/slab.h>
@@ -185,6 +187,109 @@ static const struct file_operations pingpong_fops = {
 	.release = single_release,
 };
 
+static int selftest_show(struct seq_file *s, void *unused)
+{
+	struct mlink_dev *mdev = s->private;
+	struct mlink_selftest *st = &mdev->st;
+	u64 rate;
+
+	mutex_lock(&st->lock);
+	rate = st->tx_ns ? div64_u64((u64)st->tx_sent * NSEC_PER_SEC, st->tx_ns) : 0;
+	seq_printf(s, "tx_sent %u err %d ns %llu msgs_per_s %llu kicks %llu suppressed %llu space_waits %llu lost_space_wakeups %llu kick_suppress %d unsafe_no_mb %d\n",
+		   st->tx_sent, st->tx_err, st->tx_ns, rate, st->tx_kicks,
+		   st->tx_suppressed, st->tx_space_waits, st->tx_lost_wakeups,
+		   kick_suppress, unsafe_no_mb);
+	mutex_unlock(&st->lock);
+	return 0;
+}
+
+static int selftest_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, selftest_show, inode->i_private);
+}
+
+static ssize_t selftest_write(struct file *file, const char __user *ubuf,
+			      size_t len, loff_t *ppos)
+{
+	struct mlink_dev *mdev = ((struct seq_file *)file->private_data)->private;
+	u32 n;
+	int ret;
+
+	ret = kstrtou32_from_user(ubuf, len, 0, &n);
+	if (ret)
+		return ret;
+	if (!n)
+		return -EINVAL;
+	ret = mlink_selftest_tx(mdev, n);
+	return ret ? ret : len;
+}
+
+static const struct file_operations selftest_fops = {
+	.owner = THIS_MODULE,
+	.open = selftest_open,
+	.read = seq_read,
+	.write = selftest_write,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+
+/* Verifier results; racy snapshot of counters owned by the rx work. */
+static int selftest_rx_show(struct seq_file *s, void *unused)
+{
+	struct mlink_dev *mdev = s->private;
+	struct mlink_selftest *st = &mdev->st;
+	u64 ok = READ_ONCE(st->rx_ok);
+	u64 ns = READ_ONCE(st->rx_last_ns) - READ_ONCE(st->rx_first_ns);
+
+	seq_printf(s, "rx_ok %llu lost %llu dup_ooo %llu corrupt %llu next_seq %u msgs_per_s %llu\n",
+		   ok, READ_ONCE(st->rx_lost), READ_ONCE(st->rx_dup_ooo),
+		   READ_ONCE(st->rx_corrupt), READ_ONCE(st->rx_expect),
+		   ns ? div64_u64(ok * NSEC_PER_SEC, ns) : 0);
+	return 0;
+}
+DEFINE_SHOW_ATTRIBUTE(selftest_rx);
+
+static int stats_show(struct seq_file *s, void *unused)
+{
+	struct mlink_stats *st = &((struct mlink_dev *)s->private)->stats;
+
+#define P(f) seq_printf(s, "%-22s %llu\n", #f, READ_ONCE(st->f))
+	P(tx_kicks);
+	P(tx_kick_suppressed);
+	P(tx_space_waits);
+	P(tx_lost_space_wakeups);
+	P(tx_space_timeouts);
+	P(rx_msgs);
+	P(rx_len_errors);
+	P(rx_proto_errors);
+	P(rx_stalls);
+	P(space_kicks);
+	P(ring_corruptions);
+#undef P
+	return 0;
+}
+DEFINE_SHOW_ATTRIBUTE(stats);
+
+static void ring_dump(struct seq_file *s, const char *name, struct mlink_ring *r)
+{
+	struct mlink_ring_ctrl *c = r->ctrl;
+
+	seq_printf(s, "%s: local_idx %u prod %u cons %u want_space %u want_kick %u\n",
+		   name, r->idx, READ_ONCE(c->prod.val), READ_ONCE(c->cons.val),
+		   READ_ONCE(c->want_space.val), READ_ONCE(c->want_kick.val));
+}
+
+static int ring_show(struct seq_file *s, void *unused)
+{
+	struct mlink_dev *mdev = s->private;
+
+	ring_dump(s, "tx", &mdev->tx);
+	ring_dump(s, "rx", &mdev->rx);
+	seq_printf(s, "rx_broken %d\n", READ_ONCE(mdev->rx_broken));
+	return 0;
+}
+DEFINE_SHOW_ATTRIBUTE(ring);
+
 void mlink_debugfs_init(struct mlink_dev *mdev)
 {
 	/* debugfs errors are not fatal; the calls accept an ERR_PTR parent. */
@@ -194,6 +299,10 @@ void mlink_debugfs_init(struct mlink_dev *mdev)
 	debugfs_create_file("ring_doorbell", 0200, mdev->dbg, mdev,
 			    &ring_doorbell_fops);
 	debugfs_create_file("pingpong", 0600, mdev->dbg, mdev, &pingpong_fops);
+	debugfs_create_file("selftest", 0600, mdev->dbg, mdev, &selftest_fops);
+	debugfs_create_file("selftest_rx", 0444, mdev->dbg, mdev, &selftest_rx_fops);
+	debugfs_create_file("stats", 0444, mdev->dbg, mdev, &stats_fops);
+	debugfs_create_file("ring", 0444, mdev->dbg, mdev, &ring_fops);
 }
 
 void mlink_debugfs_exit(struct mlink_dev *mdev)

@@ -9,6 +9,11 @@ running in two KVM guests ("ap" and "modem"), with heartbeat-based Subsystem Res
 fault injection, LKMM litmus-verified ordering, and measured throughput/latency. Full blueprint:
 `plan.md`. Progress: `checkbox.md`. Read both at the start of every session.
 
+## Session start (always)
+Read **`HANDOFF.md` first** (live state: current step, running jobs, VM/turbo state, next
+steps, open problems), then `plan.md` and `checkbox.md`, then continue from HANDOFF's "Next".
+Keep `HANDOFF.md` updated after every milestone/commit so a fresh session can resume.
+
 ## Current Phase
 Phase 0 (environment & bootstrap) — not started. Planning files written 2026-10-26.
 

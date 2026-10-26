@@ -87,6 +87,51 @@ static_assert(offsetof(struct mlink_shm_state, gen) == 12);
 static_assert(offsetof(struct mlink_shm_state, heartbeat) == 20);
 static_assert(MLINK_STATE_MODEM_OFF - MLINK_STATE_AP_OFF == sizeof(struct mlink_shm_state));
 
+/*
+ * Ring control block: four 64-byte lines, each written by exactly one side.
+ * "producer" = the side that transmits on this ring (AP for ring A).
+ */
+struct mlink_ring_word {
+	u32 val;
+	u32 pad[15];
+} __aligned(64);
+
+struct mlink_ring_ctrl {
+	struct mlink_ring_word prod;		/* writer: producer; free-running */
+	struct mlink_ring_word cons;		/* writer: consumer; free-running */
+	struct mlink_ring_word want_space;	/* writer: producer; 1 = kick SPACE */
+	struct mlink_ring_word want_kick;	/* writer: consumer; 1 = kick DATA */
+};
+static_assert(sizeof(struct mlink_ring_ctrl) == 256);
+static_assert(offsetof(struct mlink_ring_ctrl, cons) == 64);
+static_assert(offsetof(struct mlink_ring_ctrl, want_space) == 128);
+static_assert(offsetof(struct mlink_ring_ctrl, want_kick) == 192);
+
+/* Descriptor i always describes slot i. Writer: producer. */
+struct mlink_desc {
+	u32 len;		/* payload bytes in the slot, 1..slot_size */
+	u16 proto;		/* MLINK_PROTO_* */
+	u16 flags;
+	u32 seq;		/* producer sequence number (selftest, debugging) */
+	u32 rsvd;
+};
+static_assert(sizeof(struct mlink_desc) == 16);
+
+#define MLINK_PROTO_IPV4	0x0800
+#define MLINK_PROTO_IPV6	0x86dd
+#define MLINK_PROTO_TEST	0xfffe	/* ring selftest payload, never reaches the stack */
+
+/* Offsets inside one ring region. */
+#define MLINK_RING_CTRL_OFF	0x0000
+#define MLINK_RING_DESC_OFF	0x1000
+#define MLINK_RING_SLOTS_OFF	0x2000
+#define MLINK_RING_SIZE		(MLINK_RING_SLOTS_OFF + MLINK_RING_ENTRIES * MLINK_SLOT_SIZE)
+static_assert(MLINK_RING_DESC_OFF >= sizeof(struct mlink_ring_ctrl));
+static_assert(MLINK_RING_SLOTS_OFF - MLINK_RING_DESC_OFF >=
+	      MLINK_RING_ENTRIES * sizeof(struct mlink_desc));
+static_assert(MLINK_RING_A_OFF + MLINK_RING_SIZE == MLINK_RING_B_OFF);
+static_assert(MLINK_RING_B_OFF + MLINK_RING_SIZE == MLINK_LAYOUT_END);
+
 /* Layout sanity: regions are ordered, aligned and fit in 4 MiB. */
 static_assert((MLINK_RING_ENTRIES & (MLINK_RING_ENTRIES - 1)) == 0);
 static_assert(MLINK_STATE_AP_OFF >= MLINK_HDR_OFF + sizeof(struct mlink_shm_hdr));
