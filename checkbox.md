@@ -7,7 +7,7 @@
 - [x] P0.1 Create repo skeleton on Windows (git init, LF .gitattributes, .gitignore, GPL-2.0 LICENSE, directory tree, first commit)
 - [ ] P0.2 Create public GitHub repo `mlink`, add SSH remote, verify `ssh -T git@github.com`, first push after user confirms
 - [x] P0.3 Add user-approved `~/.ssh/config` aliases on Windows (kali, mlink-ap, mlink-modem) and verify `ssh kali hostname`
-- [ ] P0.4 Write `setup-root.sh`; user runs it with sudo in their own terminal (packages, work dirs, narrow NOPASSWD rule for mlink-bench-prep only)
+- [x] P0.4 Write `setup-root.sh`; user runs it with sudo in their own terminal (packages, work dirs, narrow NOPASSWD rule for mlink-bench-prep only)
 - [ ] P0.4b User writes `~/D/mlink-work/.secrets/sudo.pass` (0600); `msudo.sh true` works and logs to `logs/sudo.log` without exposing the password
 - [ ] P0.5 Fetch kernel LTS source (shallow) and QEMU 10.2.2 tarball; record exact kernel tag in plan.md Key Decisions
 - [ ] P0.6 Build `ivshmem-server` from QEMU source (or fallback: write `ivshmem-lite-server.c`) and verify socket + `/dev/shm/mlink-shm`

@@ -132,6 +132,8 @@ fi
 rm -f "$TMP"
 
 # --- 5. work directories, owned by the user ----------------------------------
+# Create the parent explicitly: install -d would otherwise make it root-owned.
+install -d -o "$U" -g "$U" -m 0755 "$H/D/mlink-work"
 for d in src build images share logs run results bin; do
 	install -d -o "$U" -g "$U" -m 0755 "$H/D/mlink-work/$d"
 done
