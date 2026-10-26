@@ -745,7 +745,10 @@ For each phase N:
   `scripts/host/msudo.sh` so the password never enters Claude's context; every root command
   logged to `logs/sudo.log` and reported to the user; allow/deny list in CLAUDE.md hard rule 3.
   Supersedes the "no sudo from Claude" part of D12.
-- *(P0.5: record exact kernel tag here)*
+- **D14 (2026-10-27)** Guest kernel = **v6.18.59** (latest 6.18 longterm per kernel.org
+  releases.json on 2026-10-27; 7.2.13 stable / 7.3 mainline not chosen — LTS for stable APIs).
+  QEMU source 10.2.2, GPG signature verified (key CEACC9E15534EBABB82D3FA03353C9CEF108B584),
+  sha256 784b296ff29c1417aa72323abcb2d2ea9ab9771724f577dcd785c3b04f21e176.
 
 ## 12. Notes & references
 - QEMU: `docs/specs/ivshmem-spec.rst`, `docs/system/devices/ivshmem.rst`,
