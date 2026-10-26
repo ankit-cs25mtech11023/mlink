@@ -48,7 +48,9 @@ traffic_report() {
 	echo "ping: $(grep -E 'packets transmitted' /tmp/ssr-ping.$$)"
 	echo "ping gap (longest without reply): $(grep -o '^\[[0-9.]*\]' /tmp/ssr-ping.$$ |
 		tr -d '[]' | awk 'NR>1 { g = $1 - p; if (g > m) m = g } { p = $1 } END { printf "%.0f ms", m * 1000 }')"
-	if grep -q receiver /tmp/ssr-iperf.$$; then
+	# Survived = the client finished without error and the receiver got data.
+	if grep -q receiver /tmp/ssr-iperf.$$ && ! grep -qi error /tmp/ssr-iperf.$$ &&
+	   ! grep receiver /tmp/ssr-iperf.$$ | grep -q ' 0.00 Bytes'; then
 		echo "TCP: survived — $(grep receiver /tmp/ssr-iperf.$$ | awk '{print $5, $6, $7, $8}')"
 	else
 		echo "TCP: did NOT survive — $(grep -iE 'error|unable' /tmp/ssr-iperf.$$ | head -1)"

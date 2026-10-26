@@ -47,18 +47,18 @@
 - [x] P3.5 Add stats64 with u64_stats_sync and ethtool ops (drvinfo, link, ringparam, `ethtool -S` driver counters)
 - [x] P3.6 Add TRACE_EVENT tracepoints (xmit, kick, irq, napi_poll, rx)
 - [x] P3.7 Bring-up script + verify ping, tcpdump, iperf3 TCP/UDP/reverse/parallel both ways, counters consistent, route via mlink0
-- [ ] P3.8 Pass 10-minute bidirectional soak with ping flood and link flaps (no watchdog timeouts, dmesg gate clean)
+- [x] P3.8 Pass 10-minute bidirectional soak with ping flood and link flaps (no watchdog timeouts, dmesg gate clean)
 - [x] P3.9 Complete `scripts/win/test.sh` end-to-end smoke test (sync→build→load→ping→iperf3→unload→dmesg gate)
-- [ ] P3.10 Record first throughput and RTT numbers (debug kernel, labeled)
-- [ ] P3.11 Write `docs/walkthrough/phase3.md`
+- [x] P3.10 Record first throughput and RTT numbers (debug kernel, labeled)
+- [x] P3.11 Write `docs/walkthrough/phase3.md`
 - [ ] P3.12 Study gate 3 passed (net_device, sk_buff, NAPI, softirq context, queue stop/wake, GRO) — minimum resume bullet unlocked
 
 ## Phase 4: Link state machine & Subsystem Restart
-- [ ] P4.1 Specify link state machine + generation handshake in `docs/design.md` (diagram, single-writer fields)
-- [ ] P4.2 Implement heartbeat + watchdog delayed_work with `hb_ms` / `hb_timeout_ms` params
-- [ ] P4.3 Implement teardown and re-handshake (carrier off, stop queue, napi_disable, drop in-flight, reset owned indices, re-UP)
-- [ ] P4.4 Implement STATE vector for fast graceful-down detection
-- [ ] P4.5 Run SSR scenarios a–e with live TCP + ping and record detection/recovery times, ping gap, TCP survival, packets lost
+- [x] P4.1 Specify link state machine + generation handshake in `docs/design.md` (diagram, single-writer fields)
+- [x] P4.2 Implement heartbeat + watchdog delayed_work with `hb_ms` / `hb_timeout_ms` params
+- [x] P4.3 Implement teardown and re-handshake (carrier off, stop queue, napi_disable, drop in-flight, reset owned indices, re-UP)
+- [x] P4.4 Implement STATE vector for fast graceful-down detection
+- [x] P4.5 Run SSR scenarios a–e with live TCP + ping and record detection/recovery times, ping gap, TCP survival, packets lost
 - [ ] P4.6 Write `docs/walkthrough/phase4.md`
 - [ ] P4.7 Study gate 4 passed (state machines, workqueues vs softirq, napi_disable semantics, failure detection trade-offs)
 

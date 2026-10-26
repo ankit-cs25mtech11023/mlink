@@ -1,0 +1,42 @@
+# P4.5 SSR scenarios — DEBUG kernel 6.18.59-mlink-debug, turbo off, hb_ms=100 hb_timeout_ms=500
+# command: bash ~/D/mlink/scripts/host/ssr.sh <case> (on the laptop); traffic: iperf3 -t 30/60 TCP + ping -i 0.01 from AP
+# 'ping gap' = longest interval between replies (user-visible outage); last_recover_us = reset decision -> link UP on the reporting side
+# (a)(c)(d) include the deliberate 'sleep 1' (a, c) between rmmod and insmod plus a debug-kernel insmod
+# NOTE: in (b) the original report line read "TCP: survived — 0.00 Bytes" (report bug: 0 bytes was not treated as failure); relabeled here, logic fixed in ssr.sh. Numbers unchanged.
+
+=== (a) modem graceful driver restart, 2026-10-27T03:12:35+05:30
+ping: 1853 packets transmitted, 1672 received, 9.76794% packet loss, time 29997ms
+ping gap (longest without reply): 1981 ms
+TCP: survived — 141 MBytes 39.4 Mbits/sec
+link_resets:     102 (hb_timeout 1, peer_gen 0, peer_down 101, ring 0)
+last_recover_us: 1430418
+last_hb_age_ms:  2
+=== (c) AP graceful driver restart, 2026-10-27T03:13:13+05:30
+ping: 2620 packets transmitted, 2438 received, 6.94656% packet loss, time 29991ms
+ping gap (longest without reply): 2087 ms
+TCP: survived — 49.9 MBytes 13.9 Mbits/sec
+link_resets:     1 (hb_timeout 0, peer_gen 0, peer_down 1, ring 0)
+last_recover_us: 1454909
+last_hb_age_ms:  2
+=== (d) both drivers restart, 2026-10-27T03:13:52+05:30
+ping: 2564 packets transmitted, 2465 received, 3.86115% packet loss, time 29998ms
+ping gap (longest without reply): 1310 ms
+TCP: survived — 45.2 MBytes 12.7 Mbits/sec
+link_resets:     0 (hb_timeout 0, peer_gen 0, peer_down 0, ring 0)
+last_recover_us: 0
+last_hb_age_ms:  0
+=== (e) 100 consecutive modem driver restarts, 2026-10-27T03:01:38+05:30
+cycles ok: 100 / 100
+link_resets:     100 (hb_timeout 0, peer_gen 0, peer_down 100, ring 0)
+last_recover_us: 634852
+last_hb_age_ms:  92
+=== (b) modem VM kill -9 + restart, 2026-10-27T03:09:57+05:30
+modem killed
+link back UP 37.72 s after kill (includes VM boot)
+ping: 5224 packets transmitted, 2035 received, 61.0452% packet loss, time 59997ms
+ping gap (longest without reply): 35524 ms
+TCP: did NOT survive (expected: the modem VM and its TCP stack were killed) — receiver 0.00 Bytes
+link_resets:     101 (hb_timeout 1, peer_gen 0, peer_down 100, ring 0)
+last_recover_us: 34326225
+last_hb_age_ms:  520
+peer id before: 2, after: 3
