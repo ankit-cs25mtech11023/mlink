@@ -251,21 +251,12 @@ DEFINE_SHOW_ATTRIBUTE(selftest_rx);
 
 static int stats_show(struct seq_file *s, void *unused)
 {
-	struct mlink_stats *st = &((struct mlink_dev *)s->private)->stats;
+	struct mlink_dev *mdev = s->private;
+	unsigned int i;
 
-#define P(f) seq_printf(s, "%-22s %llu\n", #f, READ_ONCE(st->f))
-	P(tx_kicks);
-	P(tx_kick_suppressed);
-	P(tx_space_waits);
-	P(tx_lost_space_wakeups);
-	P(tx_space_timeouts);
-	P(rx_msgs);
-	P(rx_len_errors);
-	P(rx_proto_errors);
-	P(rx_stalls);
-	P(space_kicks);
-	P(ring_corruptions);
-#undef P
+	for (i = 0; i < mlink_nr_stats; i++)
+		seq_printf(s, "%-22s %llu\n", mlink_stat_descs[i].name,
+			   mlink_stat_read(mdev, i));
 	return 0;
 }
 DEFINE_SHOW_ATTRIBUTE(stats);

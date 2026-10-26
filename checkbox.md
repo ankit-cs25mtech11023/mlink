@@ -65,7 +65,7 @@
 ## Phase 5: Hardening & correctness
 - [ ] P5.1 Write host-side `shm_chaos` corruption injector and show driver survives (no crash, KASAN clean, counts errors, self-heals)
 - [ ] P5.2 Add debugfs fault knobs (drop kick, delay kick, corrupt tx len) and verify TCP + link self-heal
-- [ ] P5.3 Make driver checkpatch --strict, sparse (C=1) and W=1 clean
+- [x] P5.3 Make driver checkpatch --strict, sparse (C=1) and W=1 clean
 - [ ] P5.4 (optional) Build KCSAN kernel and run soak
 - [ ] P5.5 Pass 1-hour soak with traffic + chaos + periodic SSR (dmesg gate clean)
 - [ ] P5.6 Write `docs/walkthrough/phase5.md`

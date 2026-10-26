@@ -1,0 +1,29 @@
+# P5.3 static analysis — 2026-10-27T03:19:57+05:30
+# checkpatch: scripts/checkpatch.pl --strict --no-tree -f driver/mlink_*.c driver/mlink*.h (v6.18.59 tree)
+# remaining findings are only in mlink_trace.h: TRACE_EVENT macro layout (alignment / line ends with '('), same as in-tree trace headers
+mlink_trace.h:15: CHECK: Alignment should match open parenthesis
+mlink_trace.h:17: CHECK: Lines should not end with a '('
+mlink_trace.h:22: CHECK: Lines should not end with a '('
+mlink_trace.h:32: CHECK: Alignment should match open parenthesis
+mlink_trace.h:34: CHECK: Lines should not end with a '('
+mlink_trace.h:38: CHECK: Lines should not end with a '('
+mlink_trace.h:46: CHECK: Alignment should match open parenthesis
+mlink_trace.h:48: CHECK: Lines should not end with a '('
+mlink_trace.h:51: CHECK: Lines should not end with a '('
+mlink_trace.h:58: CHECK: Alignment should match open parenthesis
+mlink_trace.h:60: CHECK: Lines should not end with a '('
+mlink_trace.h:64: CHECK: Lines should not end with a '('
+mlink_trace.h:72: CHECK: Alignment should match open parenthesis
+mlink_trace.h:74: CHECK: Lines should not end with a '('
+mlink_trace.h:79: CHECK: Lines should not end with a '('
+mlink_trace.h:89: CHECK: Alignment should match open parenthesis
+mlink_trace.h:91: CHECK: Lines should not end with a '('
+mlink_trace.h:96: CHECK: Lines should not end with a '('
+# sparse 0.6.5~rc1 (make C=2) + W=1:
+  CHECK   mlink_main.c
+  CHECK   mlink_debugfs.c
+  CHECK   mlink_ring.c
+  CHECK   mlink_selftest.c
+  CHECK   mlink_net.c
+  CHECK   mlink_link.c
+# => 0 sparse warnings, 0 W=1 warnings (CHECK lines = files sparse analysed)

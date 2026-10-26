@@ -267,10 +267,8 @@ static const struct net_device_ops mlink_netdev_ops = {
 
 /* ---- ethtool ------------------------------------------------------------- */
 
-static const struct {
-	char name[ETH_GSTRING_LEN];
-	size_t off;
-} mlink_gstats[] = {
+/* Driver counters, shared with debugfs "stats". */
+const struct mlink_stat_desc mlink_stat_descs[] = {
 #define S(f) { #f, offsetof(struct mlink_stats, f) }
 	S(tx_kicks), S(tx_kick_suppressed), S(tx_queue_stops), S(tx_queue_wakes),
 	S(tx_space_waits), S(tx_lost_space_wakeups), S(tx_space_timeouts),
@@ -279,6 +277,8 @@ static const struct {
 	S(link_resets), S(link_ups), S(hb_saved_by_ring),
 #undef S
 };
+
+const unsigned int mlink_nr_stats = ARRAY_SIZE(mlink_stat_descs);
 
 static void mlink_get_drvinfo(struct net_device *ndev,
 			      struct ethtool_drvinfo *info)
@@ -302,7 +302,7 @@ static void mlink_get_ringparam(struct net_device *ndev,
 
 static int mlink_get_sset_count(struct net_device *ndev, int sset)
 {
-	return sset == ETH_SS_STATS ? ARRAY_SIZE(mlink_gstats) + 1 : -EOPNOTSUPP;
+	return sset == ETH_SS_STATS ? mlink_nr_stats + 1 : -EOPNOTSUPP;
 }
 
 static void mlink_get_strings(struct net_device *ndev, u32 sset, u8 *data)
@@ -311,8 +311,8 @@ static void mlink_get_strings(struct net_device *ndev, u32 sset, u8 *data)
 
 	if (sset != ETH_SS_STATS)
 		return;
-	for (i = 0; i < ARRAY_SIZE(mlink_gstats); i++)
-		ethtool_puts(&data, mlink_gstats[i].name);
+	for (i = 0; i < mlink_nr_stats; i++)
+		ethtool_puts(&data, mlink_stat_descs[i].name);
 	ethtool_puts(&data, "rx_irqs");
 }
 
@@ -322,8 +322,8 @@ static void mlink_get_ethtool_stats(struct net_device *ndev,
 	struct mlink_dev *mdev = ndev_to_mdev(ndev);
 	int i;
 
-	for (i = 0; i < ARRAY_SIZE(mlink_gstats); i++)
-		data[i] = READ_ONCE(*(u64 *)((u8 *)&mdev->stats + mlink_gstats[i].off));
+	for (i = 0; i < mlink_nr_stats; i++)
+		data[i] = mlink_stat_read(mdev, i);
 	data[i] = atomic_long_read(&mdev->irq_count[MLINK_VEC_DATA]);
 }
 

@@ -68,7 +68,10 @@ static void mlink_selftest_rx(struct mlink_dev *mdev, const struct mlink_rx_desc
 	if (d->seq == 0) {
 		/* A new run starts: reset the verifier. */
 		st->rx_expect = 0;
-		st->rx_ok = st->rx_lost = st->rx_dup_ooo = st->rx_corrupt = 0;
+		st->rx_ok = 0;
+		st->rx_lost = 0;
+		st->rx_dup_ooo = 0;
+		st->rx_corrupt = 0;
 		st->rx_first_ns = now;
 	}
 

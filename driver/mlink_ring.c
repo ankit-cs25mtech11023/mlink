@@ -80,9 +80,8 @@ void mlink_ring_publish(struct mlink_ring *r, u32 len, u16 proto, u32 seq)
 /* After publishing: does the consumer want a DATA kick? */
 bool mlink_ring_need_kick(struct mlink_ring *r, bool safe)
 {
-	/* Order our prod store before the want_kick load (SB pattern). */
 	if (safe)
-		virt_mb();
+		virt_mb();	/* prod store before want_kick load (SB pattern) */
 	return READ_ONCE(r->ctrl->want_kick.val);
 }
 
@@ -90,9 +89,8 @@ bool mlink_ring_need_kick(struct mlink_ring *r, bool safe)
 bool mlink_ring_arm_space(struct mlink_ring *r, bool safe)
 {
 	WRITE_ONCE(r->ctrl->want_space.val, 1);
-	/* Order the want_space store before re-reading cons (SB pattern). */
 	if (safe)
-		virt_mb();
+		virt_mb();	/* want_space store before cons re-read (SB pattern) */
 	return mlink_ring_free(r) != 0;
 }
 
@@ -150,7 +148,7 @@ void mlink_ring_release(struct mlink_ring *r)
 bool mlink_ring_need_space_kick(struct mlink_ring *r, bool safe)
 {
 	if (safe)
-		virt_mb();
+		virt_mb();	/* cons store before want_space load (SB pattern) */
 	return READ_ONCE(r->ctrl->want_space.val);
 }
 
@@ -158,9 +156,8 @@ bool mlink_ring_need_space_kick(struct mlink_ring *r, bool safe)
 bool mlink_ring_arm_kick(struct mlink_ring *r, bool safe)
 {
 	WRITE_ONCE(r->ctrl->want_kick.val, 1);
-	/* Order the want_kick store before re-reading prod (SB pattern). */
 	if (safe)
-		virt_mb();
+		virt_mb();	/* want_kick store before prod re-read (SB pattern) */
 	return READ_ONCE(r->ctrl->prod.val) != r->idx;
 }
 

@@ -5,6 +5,7 @@
 
 #include <linux/atomic.h>
 #include <linux/completion.h>
+#include <linux/ethtool.h>
 #include <linux/mutex.h>
 #include <linux/netdevice.h>
 #include <linux/u64_stats_sync.h>
@@ -129,7 +130,7 @@ struct mlink_dev {
 	struct mlink_ring rx;		/* we consume */
 	bool rx_broken;			/* NAPI: impossible index; link work resets */
 	bool tx_broken;			/* xmit/selftest: impossible index; link work resets */
-	u32 rx_stall_seen;		/* link work: consecutive "armed, pending, no progress" polls */
+	u32 rx_stall_seen;		/* link work: "armed, pending, no progress" polls */
 	u32 rx_stall_idx;		/* link work: rx.idx at the first such poll */
 	wait_queue_head_t tx_wq;	/* selftest producer, woken by the SPACE irq */
 	atomic_t tx_owner;		/* MLINK_TX_* */
@@ -161,6 +162,20 @@ struct mlink_dev {
 	struct dentry *dbg;
 };
 
+/* Named view of struct mlink_stats for ethtool -S and debugfs (mlink_net.c). */
+struct mlink_stat_desc {
+	char name[ETH_GSTRING_LEN];
+	size_t off;
+};
+
+extern const struct mlink_stat_desc mlink_stat_descs[];
+extern const unsigned int mlink_nr_stats;
+
+static inline u64 mlink_stat_read(struct mlink_dev *mdev, unsigned int i)
+{
+	return READ_ONCE(*(u64 *)((u8 *)&mdev->stats + mlink_stat_descs[i].off));
+}
+
 void mlink_kick(struct mlink_dev *mdev, enum mlink_vector vec);
 bool mlink_hdr_valid(struct mlink_dev *mdev);
 
@@ -174,6 +189,7 @@ static inline void mlink_link_kick_work(struct mlink_dev *mdev)
 {
 	mod_delayed_work(system_highpri_wq, &mdev->link_work, 0);
 }
+
 int mlink_pingpong_run(struct mlink_dev *mdev, u32 n);
 void mlink_debugfs_init(struct mlink_dev *mdev);
 void mlink_debugfs_exit(struct mlink_dev *mdev);

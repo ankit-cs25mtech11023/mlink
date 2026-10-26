@@ -49,6 +49,7 @@ struct mlink_shm_hdr {
 	u32 layout_crc;		/* crc32_le over abi_version..ring_b_off */
 	u32 rsvd[9];
 };
+
 static_assert(sizeof(struct mlink_shm_hdr) == 64);
 static_assert(offsetof(struct mlink_shm_hdr, abi_version) == 4);
 static_assert(offsetof(struct mlink_shm_hdr, ring_b_off) == 20);
@@ -81,6 +82,7 @@ struct mlink_shm_state {
 	u32 features;
 	u32 rsvd[8];
 } __aligned(64);
+
 static_assert(sizeof(struct mlink_shm_state) == 64);
 static_assert(offsetof(struct mlink_shm_state, peer_id) == 4);
 static_assert(offsetof(struct mlink_shm_state, gen) == 12);
@@ -102,6 +104,7 @@ struct mlink_ring_ctrl {
 	struct mlink_ring_word want_space;	/* writer: producer; 1 = kick SPACE */
 	struct mlink_ring_word want_kick;	/* writer: consumer; 1 = kick DATA */
 };
+
 static_assert(sizeof(struct mlink_ring_ctrl) == 256);
 static_assert(offsetof(struct mlink_ring_ctrl, cons) == 64);
 static_assert(offsetof(struct mlink_ring_ctrl, want_space) == 128);
@@ -115,6 +118,7 @@ struct mlink_desc {
 	u32 seq;		/* producer sequence number (selftest, debugging) */
 	u32 rsvd;
 };
+
 static_assert(sizeof(struct mlink_desc) == 16);
 
 #define MLINK_PROTO_IPV4	0x0800
@@ -126,7 +130,7 @@ static_assert(sizeof(struct mlink_desc) == 16);
 #define MLINK_RING_DESC_OFF	0x1000
 #define MLINK_RING_SLOTS_OFF	0x2000
 #define MLINK_RING_SIZE		(MLINK_RING_SLOTS_OFF + MLINK_RING_ENTRIES * MLINK_SLOT_SIZE)
-static_assert(MLINK_RING_DESC_OFF >= sizeof(struct mlink_ring_ctrl));
+static_assert(sizeof(struct mlink_ring_ctrl) <= MLINK_RING_DESC_OFF);
 static_assert(MLINK_RING_SLOTS_OFF - MLINK_RING_DESC_OFF >=
 	      MLINK_RING_ENTRIES * sizeof(struct mlink_desc));
 static_assert(MLINK_RING_A_OFF + MLINK_RING_SIZE == MLINK_RING_B_OFF);
@@ -134,8 +138,8 @@ static_assert(MLINK_RING_B_OFF + MLINK_RING_SIZE == MLINK_LAYOUT_END);
 
 /* Layout sanity: regions are ordered, aligned and fit in 4 MiB. */
 static_assert((MLINK_RING_ENTRIES & (MLINK_RING_ENTRIES - 1)) == 0);
-static_assert(MLINK_STATE_AP_OFF >= MLINK_HDR_OFF + sizeof(struct mlink_shm_hdr));
-static_assert(MLINK_RING_A_OFF >= MLINK_STATE_MODEM_OFF + sizeof(struct mlink_shm_state));
+static_assert(sizeof(struct mlink_shm_hdr) + MLINK_HDR_OFF <= MLINK_STATE_AP_OFF);
+static_assert(sizeof(struct mlink_shm_state) + MLINK_STATE_MODEM_OFF <= MLINK_RING_A_OFF);
 static_assert(MLINK_LAYOUT_END <= (4 << 20));
 
 #endif /* _MLINK_SHM_H */

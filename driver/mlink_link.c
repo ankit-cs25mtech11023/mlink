@@ -33,6 +33,7 @@ static void mlink_state_publish(struct mlink_dev *mdev, enum mlink_link_state st
 	WRITE_ONCE(s->peer_id, mdev->own_id);
 	WRITE_ONCE(s->mtu, mdev->ndev->mtu);
 	WRITE_ONCE(s->state, st);
+	/* Release: the fields above are visible before (or with) the magic. */
 	virt_store_release(&s->magic, MLINK_STATE_MAGIC);
 	WRITE_ONCE(mdev->link_state, st);
 }
@@ -52,8 +53,10 @@ static void mlink_link_new_gen(struct mlink_dev *mdev)
 	mlink_ring_reset_producer(&mdev->tx);
 	mlink_ring_reset_consumer(&mdev->rx);
 	mdev->tx_seq = 0;
-	/* Both error latches belong to the old incarnation (a stale tx_broken
-	 * caused an endless reset loop under TCP in P4.5). */
+	/*
+	 * Both error latches belong to the old incarnation (a stale tx_broken
+	 * caused an endless reset loop under TCP in P4.5).
+	 */
 	WRITE_ONCE(mdev->rx_broken, false);
 	WRITE_ONCE(mdev->tx_broken, false);
 	mdev->rx_stall_seen = 0;
@@ -147,6 +150,7 @@ void mlink_link_stop(struct mlink_dev *mdev)
 	struct mlink_shm_state *s = mdev->self;
 
 	WRITE_ONCE(s->state, MLINK_ST_DOWN);
+	/* Release: a peer that sees the cleared magic also sees DOWN. */
 	virt_store_release(&s->magic, 0);
 	WRITE_ONCE(mdev->link_state, MLINK_ST_DOWN);
 	if (READ_ONCE(mdev->peer_found))
