@@ -17,6 +17,7 @@ struct mlink_ring {
 	u8 *slots;
 	u32 mask;		/* entries - 1 */
 	u32 idx;		/* local copy of the index this side owns */
+	u32 seen;		/* last peer index read (diagnostics on -EIO) */
 };
 
 /* A validated view of the next descriptor, read from shm exactly once. */
@@ -28,6 +29,8 @@ struct mlink_rx_desc {
 };
 
 void mlink_ring_attach(struct mlink_ring *r, void *base, bool producer);
+void mlink_ring_reset_producer(struct mlink_ring *r);
+void mlink_ring_reset_consumer(struct mlink_ring *r);
 
 /* producer side */
 int mlink_ring_free(struct mlink_ring *r);

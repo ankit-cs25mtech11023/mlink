@@ -290,6 +290,32 @@ static int ring_show(struct seq_file *s, void *unused)
 }
 DEFINE_SHOW_ATTRIBUTE(ring);
 
+static int link_show(struct seq_file *s, void *unused)
+{
+	static const char * const st[] = { "DOWN", "WAIT_PEER", "UP" };
+	struct mlink_dev *mdev = s->private;
+	u32 ls = READ_ONCE(mdev->link_state);
+
+	seq_printf(s, "state:           %s\n", ls < ARRAY_SIZE(st) ? st[ls] : "?");
+	seq_printf(s, "gen:             %u\n", READ_ONCE(mdev->gen));
+	seq_printf(s, "peer_gen:        %u\n", READ_ONCE(mdev->peer_gen));
+	seq_printf(s, "peer_id:         %u\n", READ_ONCE(mdev->peer_id));
+	seq_printf(s, "own_heartbeat:   %u\n", READ_ONCE(mdev->self->heartbeat));
+	seq_printf(s, "peer_heartbeat:  %u\n", READ_ONCE(mdev->hb_seen));
+	seq_printf(s, "link_ups:        %llu\n", READ_ONCE(mdev->stats.link_ups));
+	seq_printf(s, "link_resets:     %llu (hb_timeout %llu, peer_gen %llu, peer_down %llu, ring %llu)\n",
+		   READ_ONCE(mdev->stats.link_resets),
+		   READ_ONCE(mdev->reset_count[MLINK_RESET_HB_TIMEOUT]),
+		   READ_ONCE(mdev->reset_count[MLINK_RESET_PEER_GEN]),
+		   READ_ONCE(mdev->reset_count[MLINK_RESET_PEER_DOWN]),
+		   READ_ONCE(mdev->reset_count[MLINK_RESET_RING]));
+	seq_printf(s, "last_recover_us: %llu\n", READ_ONCE(mdev->last_recover_us));
+	seq_printf(s, "last_hb_age_ms:  %u\n", READ_ONCE(mdev->last_hb_age_ms));
+	seq_printf(s, "max_hb_gap_ms:   %u\n", READ_ONCE(mdev->max_hb_gap_ms));
+	return 0;
+}
+DEFINE_SHOW_ATTRIBUTE(link);
+
 void mlink_debugfs_init(struct mlink_dev *mdev)
 {
 	/* debugfs errors are not fatal; the calls accept an ERR_PTR parent. */
@@ -303,6 +329,7 @@ void mlink_debugfs_init(struct mlink_dev *mdev)
 	debugfs_create_file("selftest_rx", 0444, mdev->dbg, mdev, &selftest_rx_fops);
 	debugfs_create_file("stats", 0444, mdev->dbg, mdev, &stats_fops);
 	debugfs_create_file("ring", 0444, mdev->dbg, mdev, &ring_fops);
+	debugfs_create_file("link", 0444, mdev->dbg, mdev, &link_fops);
 }
 
 void mlink_debugfs_exit(struct mlink_dev *mdev)

@@ -99,11 +99,9 @@ int mlink_rx_poll(struct mlink_dev *mdev, int budget)
 		if (!ret)
 			break;
 		if (ret == -EIO) {
-			mdev->stats.ring_corruptions++;
+			/* Peer restart or corruption: the link work decides and resets. */
 			WRITE_ONCE(mdev->rx_broken, true);
-			dev_err_ratelimited(&mdev->pdev->dev,
-					    "rx ring corrupt: prod-cons > %u, stopping rx\n",
-					    MLINK_RING_ENTRIES);
+			mlink_link_kick_work(mdev);
 			break;
 		}
 		if (ret == -EMSGSIZE)
@@ -139,7 +137,7 @@ static int mlink_tx_wait_space(struct mlink_dev *mdev)
 	long irqs;
 
 	if (free < 0)
-		return -EIO;
+		goto broken;
 	if (free)
 		return 0;
 
@@ -151,7 +149,8 @@ static int mlink_tx_wait_space(struct mlink_dev *mdev)
 			break;
 		/* Armed and still full: the consumer now owes us a SPACE kick. */
 		if (wait_event_timeout(mdev->tx_wq,
-				       mlink_ring_free(r) || READ_ONCE(mdev->dying),
+				       mlink_ring_free(r) || READ_ONCE(mdev->dying) ||
+				       !READ_ONCE(mdev->link_up),
 				       msecs_to_jiffies(MLINK_SPACE_TIMEOUT_MS)))
 			break;
 		if (mlink_ring_free(r)) {
@@ -169,10 +168,14 @@ static int mlink_tx_wait_space(struct mlink_dev *mdev)
 		}
 	}
 	mlink_ring_disarm_space(r);
-	if (READ_ONCE(mdev->dying))
-		return -ESHUTDOWN;
-	free = mlink_ring_free(r);
-	return free < 0 ? -EIO : 0;
+	if (READ_ONCE(mdev->dying) || !READ_ONCE(mdev->link_up))
+		return -ENOTCONN;
+	if (mlink_ring_free(r) >= 0)
+		return 0;
+broken:
+	WRITE_ONCE(mdev->tx_broken, true);
+	mlink_link_kick_work(mdev);
+	return -EIO;
 }
 
 /* Push n selftest messages as fast as the ring allows. Process context. */
@@ -184,7 +187,7 @@ int mlink_selftest_tx(struct mlink_dev *mdev, u32 n)
 	u32 seq;
 	int ret = 0;
 
-	if (!READ_ONCE(mdev->peer_found))
+	if (!READ_ONCE(mdev->link_up))
 		return -ENOTCONN;
 	/* One producer per ring: refuse while mlink0 is up. */
 	if (atomic_cmpxchg(&mdev->tx_owner, MLINK_TX_FREE, MLINK_TX_SELFTEST) != MLINK_TX_FREE)
@@ -197,6 +200,11 @@ int mlink_selftest_tx(struct mlink_dev *mdev, u32 n)
 	for (seq = 0; seq < n; seq++) {
 		u32 len = st_len(seq);
 
+		/* A link reset holds st.lock; it waits for us to notice and stop. */
+		if (!READ_ONCE(mdev->link_up)) {
+			ret = -ENOTCONN;
+			break;
+		}
 		ret = mlink_tx_wait_space(mdev);
 		if (ret)
 			break;

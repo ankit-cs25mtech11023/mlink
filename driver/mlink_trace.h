@@ -85,6 +85,23 @@ TRACE_EVENT(mlink_rx,
 		  __entry->idx)
 );
 
+TRACE_EVENT(mlink_link,
+	TP_PROTO(u32 from, u32 to, u32 reason),
+	TP_ARGS(from, to, reason),
+	TP_STRUCT__entry(
+		__field(u32, from)
+		__field(u32, to)
+		__field(u32, reason)
+	),
+	TP_fast_assign(
+		__entry->from = from;
+		__entry->to = to;
+		__entry->reason = reason;
+	),
+	TP_printk("state %u -> %u reason=%u", __entry->from, __entry->to,
+		  __entry->reason)
+);
+
 #endif /* _MLINK_TRACE_H */
 
 /* Must stay outside the include guard. */

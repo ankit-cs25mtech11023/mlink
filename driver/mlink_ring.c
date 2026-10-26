@@ -23,11 +23,23 @@ void mlink_ring_attach(struct mlink_ring *r, void *base, bool producer)
 	r->desc = base + MLINK_RING_DESC_OFF;
 	r->slots = base + MLINK_RING_SLOTS_OFF;
 	r->mask = MLINK_RING_ENTRIES - 1;
-	/* Continue from the index we own in shm; P4 adds a reset handshake. */
-	if (producer)
-		r->idx = READ_ONCE(r->ctrl->prod.val);
-	else
-		r->idx = READ_ONCE(r->ctrl->cons.val);
+	r->idx = 0;	/* the link state machine resets the shared fields */
+}
+
+/* Zero the producer-owned fields (link reset, data path quiesced). */
+void mlink_ring_reset_producer(struct mlink_ring *r)
+{
+	r->idx = 0;
+	WRITE_ONCE(r->ctrl->want_space.val, 0);
+	WRITE_ONCE(r->ctrl->prod.val, 0);
+}
+
+/* Zero the consumer-owned fields (link reset, data path quiesced). */
+void mlink_ring_reset_consumer(struct mlink_ring *r)
+{
+	r->idx = 0;
+	WRITE_ONCE(r->ctrl->want_kick.val, 0);
+	WRITE_ONCE(r->ctrl->cons.val, 0);
 }
 
 /* ---- producer ------------------------------------------------------------ */
@@ -39,8 +51,10 @@ int mlink_ring_free(struct mlink_ring *r)
 	u32 cons = virt_load_acquire(&r->ctrl->cons.val);
 	u32 used = r->idx - cons;	/* unsigned wrap-around is intended */
 
-	if (unlikely(used > MLINK_RING_ENTRIES))
+	if (unlikely(used > MLINK_RING_ENTRIES)) {
+		r->seen = cons;
 		return -EIO;
+	}
 	return MLINK_RING_ENTRIES - used;
 }
 
@@ -104,8 +118,10 @@ int mlink_ring_peek(struct mlink_ring *r, struct mlink_rx_desc *d)
 
 	if (!avail)
 		return 0;
-	if (unlikely(avail > MLINK_RING_ENTRIES))
+	if (unlikely(avail > MLINK_RING_ENTRIES)) {
+		r->seen = prod;
 		return -EIO;
+	}
 
 	sd = &r->desc[r->idx & r->mask];
 	/* Fetch each peer-written field once; only the local copies are trusted. */

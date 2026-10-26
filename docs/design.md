@@ -145,6 +145,31 @@ The peer may be buggy or malicious (and P5 corrupts it on purpose). Rules:
   → drop in-flight TX → reset only the fields **this side owns** → `WAIT_PEER`.
 - Heartbeat `hb_ms` = 100, timeout `hb_timeout_ms` = 500 (module params).
 
+### 8.1 State machine as implemented (P4.1, `driver/mlink_link.c`)
+
+| Field | Writer | Meaning |
+|---|---|---|
+| `state` | owner | DOWN / WAIT_PEER / UP |
+| `gen` | owner | bumped at every (re)start **before** the owner zeroes its ring fields |
+| `peer_gen_seen` | owner | the peer `gen` the owner acknowledged (written after own gen/reset, `virt_wmb`) |
+| `heartbeat` | owner | +1 every `hb_ms` |
+| ring `prod`,`want_space` / `cons`,`want_kick` | producer / consumer | zeroed by their owner on reset |
+
+Transitions (all in the link work, process context, one instance at a time):
+- **WAIT_PEER → UP** when the peer block is valid, its heartbeat is live, peer `state ≥
+  WAIT_PEER`, we have acked its current `gen`, and it has acked ours. Because every reset bumps
+  `gen` before zeroing, "both acked the current gens" implies "both finished resetting".
+- **UP → (reset) → WAIT_PEER** on: peer block invalid or `state == DOWN` (graceful, signalled
+  with a STATE kick), peer `gen` changed (restart), heartbeat unchanged for `hb_timeout_ms`,
+  or a ring index error flagged by the data path (`rx_broken`/`tx_broken`) with unchanged gen
+  (= real corruption, counted).
+- **Reset:** carrier off → `netif_tx_disable` (waits for xmit) → `napi_disable` (waits for
+  poll) → `link_up=false`, wake + wait out a selftest producer (`st.lock`) → bump `gen`, zero
+  owned ring fields → publish WAIT_PEER → STATE kick.
+- **UP:** publish UP → `napi_enable` → schedule a first poll (drains + arms the DATA kick) →
+  carrier on → wake queue → STATE kick.
+- The data path never takes a link lock: it is *stopped* before anything it uses changes.
+
 ## 9. Teardown order (rmmod / probe failure)
 `state = DOWN` + STATE kick → unregister netdev → stop link work (`cancel_delayed_work_sync`)
 → mark `dying`, free IRQs → free MSI-X vectors → unmap (devm). IRQ handlers check `dying`.

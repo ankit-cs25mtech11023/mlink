@@ -35,6 +35,14 @@ bool unsafe_no_mb;
 module_param(unsafe_no_mb, bool, 0644);
 MODULE_PARM_DESC(unsafe_no_mb, "EXPERIMENT ONLY: drop the kick-path full barriers (P2.4)");
 
+unsigned int hb_ms = 100;
+module_param(hb_ms, uint, 0644);
+MODULE_PARM_DESC(hb_ms, "Heartbeat / link poll period in ms (default 100)");
+
+unsigned int hb_timeout_ms = 500;
+module_param(hb_timeout_ms, uint, 0644);
+MODULE_PARM_DESC(hb_timeout_ms, "Peer declared lost after this long without a heartbeat (default 500)");
+
 static enum mlink_role mlink_role;
 
 void mlink_kick(struct mlink_dev *mdev, enum mlink_vector vec)
@@ -44,14 +52,6 @@ void mlink_kick(struct mlink_dev *mdev, enum mlink_vector vec)
 	trace_mlink_kick(peer, vec);
 	/* QEMU signals eventfd[vec] of peer 'peer'; its QEMU raises MSI-X vector vec. */
 	iowrite32((peer << 16) | vec, mdev->regs + IVSHMEM_DOORBELL);
-}
-
-/* Run NAPI from process context: BHs off so the softirq runs on bh enable. */
-static void mlink_napi_kick_local(struct mlink_dev *mdev)
-{
-	local_bh_disable();
-	napi_schedule(&mdev->napi);
-	local_bh_enable();
 }
 
 /* ---- interrupts --------------------------------------------------------- */
@@ -87,13 +87,15 @@ static irqreturn_t mlink_space_irq(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
-/* STATE only counts until the link state machine (P4). */
+/* The peer's state block changed: run the link work now, not in <= hb_ms. */
 static irqreturn_t mlink_state_irq(int irq, void *data)
 {
 	struct mlink_dev *mdev = data;
 
 	atomic_long_inc(&mdev->irq_count[MLINK_VEC_STATE]);
 	trace_mlink_irq(MLINK_VEC_STATE);
+	if (READ_ONCE(mdev->ready) && !READ_ONCE(mdev->dying))
+		mlink_link_kick_work(mdev);
 	return IRQ_HANDLED;
 }
 
@@ -144,7 +146,7 @@ static void mlink_hdr_expected(struct mlink_shm_hdr *h)
 }
 
 /* True if the shared header matches exactly what this build expects. */
-static bool mlink_hdr_valid(struct mlink_dev *mdev)
+bool mlink_hdr_valid(struct mlink_dev *mdev)
 {
 	struct mlink_shm_hdr *sh = mdev->hdr;
 	struct mlink_shm_hdr want, got;
@@ -188,80 +190,6 @@ static void mlink_hdr_publish(struct mlink_dev *mdev)
 	WRITE_ONCE(sh->layout_crc, want.layout_crc);
 	/* All fields become visible before (or with) the magic. */
 	virt_store_release(&sh->magic, MLINK_SHM_MAGIC);
-}
-
-static void mlink_state_publish(struct mlink_dev *mdev, enum mlink_link_state st)
-{
-	struct mlink_shm_state *s = mdev->self;
-
-	WRITE_ONCE(s->peer_id, mdev->own_id);
-	WRITE_ONCE(s->state, st);
-	WRITE_ONCE(s->mtu, mdev->ndev->mtu);
-	virt_store_release(&s->magic, MLINK_STATE_MAGIC);
-}
-
-/* ---- peer discovery (becomes the heartbeat/link state machine in P4) ---- */
-
-static void mlink_link_work(struct work_struct *work)
-{
-	struct mlink_dev *mdev = container_of(to_delayed_work(work),
-					      struct mlink_dev, link_work);
-	struct device *dev = &mdev->pdev->dev;
-	struct mlink_shm_state *p = mdev->peer;
-	u32 magic, pid, gen;
-
-	if (!mdev->hdr_ok) {
-		/* Modem: the AP owns the layout; wait until it has published it. */
-		if (!mlink_hdr_valid(mdev))
-			goto again;
-		WRITE_ONCE(mdev->hdr_ok, true);
-		dev_info(dev, "shared header valid (abi %u)\n", MLINK_ABI_VERSION);
-		mlink_state_publish(mdev, MLINK_ST_WAIT_PEER);
-	}
-
-	magic = virt_load_acquire(&p->magic);
-	pid = READ_ONCE(p->peer_id);
-	gen = READ_ONCE(p->gen);
-
-	/* The doorbell has 16 bits for the peer ID; anything else is garbage. */
-	if (magic == MLINK_STATE_MAGIC && pid <= U16_MAX && pid != mdev->own_id) {
-		if (!mdev->peer_found || pid != mdev->peer_id) {
-			WRITE_ONCE(mdev->peer_id, pid);
-			WRITE_ONCE(mdev->peer_found, true);
-			dev_info(dev, "peer found: id=%u gen=%u\n", pid, gen);
-			netif_carrier_on(mdev->ndev);
-		}
-	} else if (mdev->peer_found) {
-		WRITE_ONCE(mdev->peer_found, false);
-		dev_info(dev, "peer gone\n");
-		netif_carrier_off(mdev->ndev);
-	}
-
-	/*
-	 * Watchdog for lost DATA kicks: kick armed, data waiting and NO progress
-	 * (rx index unchanged) across two polls (>= 100 ms) means a wakeup was
-	 * lost. "Armed + pending" alone is normal for the few microseconds
-	 * between a publish and its interrupt. Count it and recover, so a
-	 * missing barrier shows up as a number, not a hang.
-	 */
-	if (!READ_ONCE(mdev->rx_broken) && mlink_ring_kick_armed(&mdev->rx) &&
-	    mlink_ring_pending(&mdev->rx) &&
-	    (!mdev->rx_stall_seen || mdev->rx.idx == mdev->rx_stall_idx)) {
-		mdev->rx_stall_idx = mdev->rx.idx;
-		if (++mdev->rx_stall_seen >= 2) {
-			mdev->stats.rx_stalls++;
-			mdev->rx_stall_seen = 0;
-			mlink_ring_disarm_kick(&mdev->rx);
-			mlink_napi_kick_local(mdev);
-		}
-	} else {
-		mdev->rx_stall_seen = 0;
-	}
-
-again:
-	if (!READ_ONCE(mdev->dying))
-		schedule_delayed_work(&mdev->link_work,
-				      msecs_to_jiffies(MLINK_PEER_POLL_MS));
 }
 
 /* ---- PCI driver ---------------------------------------------------------- */
@@ -343,25 +271,22 @@ static int mlink_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		return dev_err_probe(dev, ret, "cannot register netdev\n");
 	pci_set_drvdata(pdev, mdev);
 
+	/* The AP owns the layout; the modem starts once it has validated it. */
 	if (mdev->role == MLINK_ROLE_AP) {
 		if (!mlink_hdr_valid(mdev))
 			mlink_hdr_publish(mdev);
 		mdev->hdr_ok = true;
+		mlink_link_start(mdev);
 	}
-	/* Our own block: the previous incarnation's gen survives in shm. */
-	WRITE_ONCE(mdev->self->gen, READ_ONCE(mdev->self->gen) + 1);
-	if (mdev->hdr_ok)
-		mlink_state_publish(mdev, MLINK_ST_WAIT_PEER);
 
 	mlink_debugfs_init(mdev);
 	WRITE_ONCE(mdev->ready, true);
-	/* First poll drains anything pending and arms the DATA kick. */
-	mlink_napi_kick_local(mdev);
-	schedule_delayed_work(&mdev->link_work, 0);
+	/* High-priority workers: a heartbeat starved by bulk traffic looks like a dead peer. */
+	queue_delayed_work(system_highpri_wq, &mdev->link_work, 0);
 
-	dev_info(dev, "%s: role=%s own_id=%u gen=%u shm=%pa bytes\n",
+	dev_info(dev, "%s: role=%s own_id=%u shm=%pa bytes\n",
 		 netdev_name(mdev->ndev), mlink_role_name(mdev->role),
-		 mdev->own_id, READ_ONCE(mdev->self->gen), &mdev->shm_len);
+		 mdev->own_id, &mdev->shm_len);
 	return 0;
 }
 
@@ -375,9 +300,7 @@ static void mlink_remove(struct pci_dev *pdev)
 	wake_up(&mdev->tx_wq);		/* a selftest waiting for space bails out */
 	mlink_debugfs_exit(mdev);	/* waits for running pingpong/selftest */
 	cancel_delayed_work_sync(&mdev->link_work);
-
-	WRITE_ONCE(mdev->self->state, MLINK_ST_DOWN);
-	virt_store_release(&mdev->self->magic, 0);
+	mlink_link_stop(mdev);	/* state DOWN + STATE kick: fast detection */
 
 	/*
 	 * Free the handlers now rather than at devres time: after this no irq

@@ -68,3 +68,50 @@ Format: symptom → hypotheses → evidence → root cause → fix → lesson. N
   a *paced* selftest (one message, short idle, repeat) to maximise arm/publish collisions.
 - **Lesson:** absence of a failure in testing ≠ correctness; memory-ordering bugs need a model
   checker or a targeted stress that lives inside the race window.
+
+---
+
+## 2026-10-27 — P4.5: endless "ring error" reset loop after a restart under TCP
+
+- **Symptom:** SSR scenario (a) (modem driver restart with live iperf3): the link recovered
+  and TCP survived, but the AP logged ~180 resets in 30 s, all `ring error`, each ~110 ms
+  (one link-work period) after `link UP`. Scenario (e) — 100 restarts *without* traffic — was
+  clean.
+- **Hypothesis 1:** a SPACE irq wakes the TX queue between `netif_tx_disable()` and the
+  index reset, so `xmit`'s `idx++` races `reset_producer()`'s `idx = 0`. Real race (the reset
+  cleared `link_up` *after* disabling TX, and the SPACE handler only checks `link_up`). Fixed:
+  `link_up = false` first → `synchronize_irq(SPACE)` → `netif_tx_disable` → `napi_disable`;
+  `xmit` also refuses to run unless `link_up`. **Loop persisted** → not the (only) cause.
+- **Evidence (instrumentation instead of guessing):** the ring now remembers the peer index
+  that made a check fail, and the reset prints it:
+  `ring error: tx_broken=1 idx=0 peer_cons=0 | rx_broken=0 ...` — the ring was perfectly
+  consistent; the **flag** was stale.
+- **Root cause:** `mlink_link_new_gen()` cleared `rx_broken` but not `tx_broken` (added later in
+  the same patch). The first legitimate restart latched `tx_broken`; every subsequent UP was
+  reset on the next tick. No traffic → nothing ever set `tx_broken` → (e) was clean.
+- **Fix:** clear both latches when a new generation starts. Verified: (a)(c)(d) one reset each,
+  correct reason, TCP survives.
+- **Lesson:** when adding a new piece of state, grep for every place the sibling state is
+  reset. And: instrument the decision point (print the values that triggered it) before
+  theorising — the second hypothesis was found in one run.
+
+---
+
+## 2026-10-27 — P4.5: heartbeat starvation → false "peer dead" under bulk TCP
+
+- **Symptom:** after the loop fix, (c) still showed a `heartbeat timeout` reset on the modem
+  while the AP was alive, at random points during iperf3.
+- **Measurement:** added `max_hb_gap_ms` (longest peer-heartbeat interval while UP). With
+  `hb_timeout_ms=5000` and 70 s of TCP: **3.6 s and 5.2 s** gaps — each guest's link work
+  (which writes the heartbeat) sometimes didn't run for seconds, even after moving it to
+  `system_highpri_wq` (nice −20 workers).
+- **Suspected cause (not yet proven):** debug kernel (KASAN) + `PREEMPT_VOLUNTARY`: long
+  non-preemptible kernel stretches in the TCP send path and softirq processing on 2 vCPUs;
+  the heartbeat timer and work can't run. To test later: boot with `preempt=full`, perf kernel.
+- **Fix (design):** liveness = heartbeat **or ring progress** by the peer (its `prod` on the
+  ring it sends on, its `cons` on the ring it consumes). A dead peer makes neither; a busy peer
+  whose housekeeping is starved still moves its rings. Counter `hb_saved_by_ring` shows when
+  this rescued the link. Result: (a)(c)(d) with no false timeouts.
+- **Lesson / interview point:** failure detectors trade detection latency against false
+  positives; a heartbeat produced by a *different* execution context than the one doing the
+  work can starve independently — use the work itself as evidence of life where possible.

@@ -1,0 +1,29 @@
+# P3.8 soak — DEBUG kernel 6.18.59-mlink-debug, turbo off (bench-prep on), 600 s
+# command: bash ~/D/mlink/scripts/host/soak.sh 600 (in tmux on the laptop)
+# load: iperf3 --bidir -P 8 + ping -f AP->modem + modem mlink0 down 0.5 s / up every 5 s
+# note: iperf3 --bidir summary not captured (grep bug, fixed after this run); traffic volume is in the counters
+=== soak start 2026-10-27T02:11:04+05:30 dur=600s temp=47C
+mlink0 up: 10.77.0.1 -> 10.77.0.2
+mlink0 up: 10.77.0.2 -> 10.77.0.1
+=== iperf3 (last lines)
+=== ping flood
+--- 10.77.0.2 ping statistics ---
+302107 packets transmitted, 296649 received, 1.80664% packet loss, time 600000ms
+rtt min/avg/max/mdev = 0.525/2.305/999.002/15.649 ms, pipe 34, ipg/ewma 1.986/1.145 ms
+=== flaps
+flaps=105
+=== ap counters
+    RX:  bytes packets errors dropped  missed   mcast           
+      55936368  346084      0       0       0       0 
+    TX:  bytes packets errors dropped carrier collsns           
+     697378584  751955      0       0       0       0 
+ tx_kicks: 322078  tx_kick_suppressed: 12600  tx_queue_stops: 50  tx_queue_wakes: 50  tx_space_waits: 0  tx_lost_space_wakeups: 0  tx_space_timeouts: 0  rx_msgs: 346084  napi_polls: 308070  napi_budget_exhausted: 238  rx_len_errors: 0  rx_proto_errors: 0  rx_stalls: 0  space_kicks: 11  ring_corruptions: 0  rx_irqs: 304058 
+DMESG GATE: PASS (mlink-ap)
+=== modem counters
+    RX:  bytes packets errors dropped  missed   mcast           
+     661318216  722776      0   29179       0       0 
+    TX:  bytes packets errors dropped carrier collsns           
+      55936368  346084      0     215       0       0 
+ tx_kicks: 304058  tx_kick_suppressed: 24336  tx_queue_stops: 12  tx_queue_wakes: 11  tx_space_waits: 0  tx_lost_space_wakeups: 0  tx_space_timeouts: 0  rx_msgs: 751955  napi_polls: 325827  napi_budget_exhausted: 173  rx_len_errors: 0  rx_proto_errors: 0  rx_stalls: 0  space_kicks: 50  ring_corruptions: 0  rx_irqs: 322046 
+DMESG GATE: PASS (mlink-modem)
+=== soak end 2026-10-27T02:21:21+05:30 max_temp=56C aborted=0

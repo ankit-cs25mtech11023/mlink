@@ -50,7 +50,7 @@ while kill -0 $IPERF 2>/dev/null; do
 done
 wait $IPERF $PING $FLAP 2>/dev/null
 
-echo "=== iperf3 (last lines)"; grep -E "SUM.*(sender|receiver)" /tmp/mlink-soak-iperf.$$ | tail -4
+echo "=== iperf3 (last lines)"; grep -E "SUM.*(sender|receiver)" /tmp/mlink-soak-iperf.$$ | tail -4; grep -cE "^\[SUM\]" /tmp/mlink-soak-iperf.$$ | sed "s/^/interval lines: /"
 echo "=== ping flood"; tail -3 /tmp/mlink-soak-ping.$$
 echo "=== flaps"; cat /tmp/mlink-soak-flap.$$
 rm -f /tmp/mlink-soak-*.$$

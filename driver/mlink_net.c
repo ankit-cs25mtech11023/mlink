@@ -41,6 +41,13 @@ static netdev_tx_t mlink_start_xmit(struct sk_buff *skb, struct net_device *ndev
 	u16 proto;
 	int free;
 
+	/* Belt and braces: never touch the ring outside UP (link reset owns it). */
+	if (unlikely(!READ_ONCE(mdev->link_up))) {
+		netif_stop_queue(ndev);
+		mlink_tx_drop(mdev, skb);
+		return NETDEV_TX_OK;
+	}
+
 	switch (skb->protocol) {
 	case htons(ETH_P_IP):
 		proto = MLINK_PROTO_IPV4;
@@ -58,13 +65,28 @@ static netdev_tx_t mlink_start_xmit(struct sk_buff *skb, struct net_device *ndev
 	}
 
 	free = mlink_ring_free(r);
-	if (unlikely(free <= 0)) {
-		/* Queue should already be stopped; never spin on a broken ring. */
-		if (free < 0)
-			mdev->stats.ring_corruptions++;
+	if (unlikely(free < 0)) {
+		/* Impossible index: peer restart or corruption, link work decides. */
+		WRITE_ONCE(mdev->tx_broken, true);
+		mlink_link_kick_work(mdev);
 		netif_stop_queue(ndev);
 		mlink_tx_drop(mdev, skb);
 		return NETDEV_TX_OK;
+	}
+	if (unlikely(!free)) {
+		/*
+		 * Full although the queue was running (e.g. ifup while the ring was
+		 * still full). Not steady state: stop, ask for a SPACE kick, and let
+		 * the core requeue this skb instead of dropping it.
+		 */
+		netif_stop_queue(ndev);
+		mdev->stats.tx_queue_stops++;
+		if (mlink_ring_arm_space(r, safe)) {
+			mlink_ring_disarm_space(r);
+			netif_wake_queue(ndev);
+			mdev->stats.tx_queue_wakes++;
+		}
+		return NETDEV_TX_BUSY;
 	}
 
 	/* Copy (no zero-copy): the peer must never see pointers into our memory. */
@@ -109,7 +131,8 @@ void mlink_net_space(struct mlink_dev *mdev)
 {
 	struct net_device *ndev = mdev->ndev;
 
-	if (netif_queue_stopped(ndev) && mlink_ring_free(&mdev->tx) > 0) {
+	if (READ_ONCE(mdev->link_up) && netif_queue_stopped(ndev) &&
+	    mlink_ring_free(&mdev->tx) > 0) {
 		mlink_ring_disarm_space(&mdev->tx);
 		netif_wake_queue(ndev);
 		mdev->stats.tx_queue_wakes++;
@@ -192,7 +215,11 @@ static int mlink_open(struct net_device *ndev)
 	/* One producer per ring: refuse while a ring selftest owns TX. */
 	if (atomic_cmpxchg(&mdev->tx_owner, MLINK_TX_FREE, MLINK_TX_NETDEV) != MLINK_TX_FREE)
 		return -EBUSY;
-	netif_start_queue(ndev);
+	/* The queue runs only while the link is UP; the link work wakes it. */
+	if (READ_ONCE(mdev->link_up))
+		netif_start_queue(ndev);
+	else
+		netif_tx_stop_all_queues(ndev);
 	return 0;
 }
 
@@ -249,6 +276,7 @@ static const struct {
 	S(tx_space_waits), S(tx_lost_space_wakeups), S(tx_space_timeouts),
 	S(rx_msgs), S(napi_polls), S(napi_budget_exhausted), S(rx_len_errors),
 	S(rx_proto_errors), S(rx_stalls), S(space_kicks), S(ring_corruptions),
+	S(link_resets), S(link_ups), S(hb_saved_by_ring),
 #undef S
 };
 
@@ -351,8 +379,7 @@ int mlink_net_init(struct mlink_dev *mdev)
 		mdev->ndev = NULL;
 		return ret;
 	}
-	/* NAPI follows the link, not ifup: the selftest consumes while down. */
-	napi_enable(&mdev->napi);
+	/* NAPI stays disabled until the link work brings the link UP. */
 	return 0;
 }
 
@@ -361,7 +388,11 @@ void mlink_net_exit(struct mlink_dev *mdev)
 {
 	if (!mdev->ndev)
 		return;
-	napi_disable(&mdev->napi);	/* waits for a running poll */
+	if (mdev->link_up) {
+		netif_tx_disable(mdev->ndev);
+		napi_disable(&mdev->napi);	/* waits for a running poll */
+		mdev->link_up = false;
+	}
 	unregister_netdev(mdev->ndev);
 	netif_napi_del(&mdev->napi);
 	free_netdev(mdev->ndev);

@@ -27,6 +27,16 @@
 /* Module parameters (mlink_main.c) */
 extern bool kick_suppress;
 extern bool unsafe_no_mb;
+extern unsigned int hb_ms;
+extern unsigned int hb_timeout_ms;
+
+enum mlink_reset_reason {
+	MLINK_RESET_HB_TIMEOUT,
+	MLINK_RESET_PEER_GEN,
+	MLINK_RESET_PEER_DOWN,
+	MLINK_RESET_RING,
+	MLINK_NR_RESET_REASONS,
+};
 
 enum mlink_role {
 	MLINK_ROLE_AP,
@@ -62,7 +72,10 @@ struct mlink_stats {
 	u64 napi_polls;			/* NAPI */
 	u64 napi_budget_exhausted;	/* NAPI: poll used its whole budget */
 	u64 space_kicks;		/* consumer work: SPACE kicks sent */
-	u64 ring_corruptions;		/* impossible prod/cons seen */
+	u64 ring_corruptions;		/* impossible prod/cons with unchanged peer gen */
+	u64 link_resets;		/* link work */
+	u64 link_ups;			/* link work */
+	u64 hb_saved_by_ring;		/* heartbeat stale but peer ring progress seen */
 };
 
 /* Ring selftest (P2.3): sequence-numbered pseudo-random payloads. */
@@ -114,7 +127,8 @@ struct mlink_dev {
 
 	struct mlink_ring tx;		/* we produce */
 	struct mlink_ring rx;		/* we consume */
-	bool rx_broken;			/* corruption seen; stop consuming (P4 resets) */
+	bool rx_broken;			/* NAPI: impossible index; link work resets */
+	bool tx_broken;			/* xmit/selftest: impossible index; link work resets */
 	u32 rx_stall_seen;		/* link work: consecutive "armed, pending, no progress" polls */
 	u32 rx_stall_idx;		/* link work: rx.idx at the first such poll */
 	wait_queue_head_t tx_wq;	/* selftest producer, woken by the SPACE irq */
@@ -126,7 +140,20 @@ struct mlink_dev {
 	struct mlink_netstats rx_stats;	/* NAPI context */
 	struct mlink_netstats tx_stats;	/* xmit context */
 
-	struct delayed_work link_work;	/* peer discovery, later heartbeat (P4) */
+	/* link state machine (mlink_link.c); written only by the link work */
+	struct delayed_work link_work;
+	enum mlink_link_state link_state;
+	bool link_up;			/* read locklessly by the data path / selftest */
+	u32 gen;			/* our current generation */
+	u32 peer_gen;			/* peer generation we acknowledged */
+	u32 hb_seen;			/* last peer heartbeat value */
+	unsigned long hb_changed;	/* jiffies when it last changed */
+	ktime_t t_detect;		/* when the last reset was decided */
+	u64 last_recover_us;		/* reset decision -> link UP */
+	u32 last_hb_age_ms;		/* peer heartbeat age when the last reset was decided */
+	u32 max_hb_gap_ms;		/* longest peer heartbeat interval seen while UP */
+	u32 peer_activity;		/* fingerprint of peer ring progress (liveness) */
+	u64 reset_count[MLINK_NR_RESET_REASONS];
 	atomic_long_t irq_count[MLINK_NR_VECTORS];
 	struct mlink_stats stats;
 	struct mlink_pingpong pp;
@@ -135,6 +162,18 @@ struct mlink_dev {
 };
 
 void mlink_kick(struct mlink_dev *mdev, enum mlink_vector vec);
+bool mlink_hdr_valid(struct mlink_dev *mdev);
+
+/* mlink_link.c */
+void mlink_link_start(struct mlink_dev *mdev);
+void mlink_link_stop(struct mlink_dev *mdev);
+void mlink_link_work(struct work_struct *work);
+
+/* From irq/softirq context: ask the link work to run now. */
+static inline void mlink_link_kick_work(struct mlink_dev *mdev)
+{
+	mod_delayed_work(system_highpri_wq, &mdev->link_work, 0);
+}
 int mlink_pingpong_run(struct mlink_dev *mdev, u32 n);
 void mlink_debugfs_init(struct mlink_dev *mdev);
 void mlink_debugfs_exit(struct mlink_dev *mdev);
