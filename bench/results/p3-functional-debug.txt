@@ -1,0 +1,42 @@
+# P3.7 functional matrix — DEBUG kernel 6.18.59-mlink-debug, turbo off. Not headline numbers.
+# date: 2026-10-27T02:06:00+05:30
+## counters before
+ap: tx 41701 txdrop 0 rx 1527 rxdrop 0 rxerr 0
+modem: tx 1527 txdrop 0 rx 41700 rxdrop 0 rxerr 0
+## TCP ap->modem 10s
+[  5]   0.00-10.01  sec  56.8 MBytes  47.6 Mbits/sec    0            sender
+[  5]   0.00-10.01  sec  56.8 MBytes  47.6 Mbits/sec                  receiver
+## TCP modem->ap (-R) 10s
+[  5]   0.00-10.01  sec  57.2 MBytes  48.0 Mbits/sec    0            sender
+[  5]   0.00-10.00  sec  56.6 MBytes  47.5 Mbits/sec                  receiver
+## TCP -P 4 10s
+[SUM]   0.00-1.00   sec  6.12 MBytes  51.3 Mbits/sec    0             
+[SUM]   1.00-3.12   sec  15.9 MBytes  62.9 Mbits/sec    0             
+[SUM]   3.12-5.43   sec  12.5 MBytes  45.5 Mbits/sec    0             
+[SUM]   5.43-6.67   sec  8.25 MBytes  55.8 Mbits/sec    0             
+[SUM]   6.67-7.80   sec   256 KBytes  1.84 Mbits/sec    0             
+[SUM]   7.80-8.00   sec  2.12 MBytes  89.9 Mbits/sec    0             
+[SUM]   8.00-9.00   sec  11.5 MBytes  96.5 Mbits/sec    0             
+[SUM]   9.00-10.98  sec  1.62 MBytes  6.88 Mbits/sec    0             
+[SUM]   0.00-10.98  sec  58.4 MBytes  44.6 Mbits/sec    0             sender
+[SUM]   0.00-10.98  sec  58.4 MBytes  44.6 Mbits/sec                  receiver
+## UDP -b 0 -l 1400 10s
+[  5]   0.00-10.00  sec  55.2 MBytes  46.3 Mbits/sec  0.000 ms  0/41340 (0%)  sender
+## UDP -R -b 0 -l 1400 10s
+[  5]   0.00-10.00  sec  53.5 MBytes  44.8 Mbits/sec  0.000 ms  0/40040 (0%)  sender
+## IPv6 link-local ping (fe80 via mlink0)
+5 packets transmitted, 5 received, 0% packet loss, time 803ms
+rtt min/avg/max/mdev = 1.052/1.725/4.112/1.194 ms
+## ping 100 ap->modem
+100 packets transmitted, 100 received, 0% packet loss, time 2039ms
+rtt min/avg/max/mdev = 0.917/1.214/2.556/0.393 ms
+## ping 100 modem->ap
+100 packets transmitted, 100 received, 0% packet loss, time 2032ms
+rtt min/avg/max/mdev = 0.896/1.172/2.186/0.378 ms
+## counters after
+ap: tx 168719 txdrop 0 rx 86952 rxdrop 0 rxerr 0
+modem: tx 86952 txdrop 0 rx 168718 rxdrop 0 rxerr 0
+## driver counters
+ap:  tx_kicks: 46283  tx_kick_suppressed: 2535  tx_queue_stops: 0  tx_queue_wakes: 0  tx_space_waits: 0  tx_lost_space_wakeups: 0  tx_space_timeouts: 0  rx_msgs: 86952  napi_polls: 46116  napi_budget_exhausted: 1  rx_len_errors: 0  rx_proto_errors: 0  rx_stalls: 0  space_kicks: 0  ring_corruptions: 0  rx_irqs: 45096 
+modem:  tx_kicks: 45105  tx_kick_suppressed: 1892  tx_queue_stops: 0  tx_queue_wakes: 0  tx_space_waits: 0  tx_lost_space_wakeups: 0  tx_space_timeouts: 0  rx_msgs: 168718  napi_polls: 47425  napi_budget_exhausted: 0  rx_len_errors: 0  rx_proto_errors: 0  rx_stalls: 0  space_kicks: 0  ring_corruptions: 0  rx_irqs: 46276 
+## temp 45C

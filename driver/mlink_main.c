@@ -7,6 +7,7 @@
  */
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
+#include <linux/bottom_half.h>
 #include <linux/crc32.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
@@ -41,24 +42,30 @@ void mlink_kick(struct mlink_dev *mdev, enum mlink_vector vec)
 	iowrite32((peer << 16) | vec, mdev->regs + IVSHMEM_DOORBELL);
 }
 
-/* ---- interrupts --------------------------------------------------------- */
-
-static irqreturn_t mlink_count_irq(struct mlink_dev *mdev, enum mlink_vector vec)
+/* Run NAPI from process context: BHs off so the softirq runs on bh enable. */
+static void mlink_napi_kick_local(struct mlink_dev *mdev)
 {
-	atomic_long_inc(&mdev->irq_count[vec]);
-	return IRQ_HANDLED;
+	local_bh_disable();
+	napi_schedule(&mdev->napi);
+	local_bh_enable();
 }
 
+/* ---- interrupts --------------------------------------------------------- */
+
+/*
+ * Handlers are registered before the netdev exists and stay registered
+ * briefly after remove() starts, so each one does nothing until 'ready'.
+ */
 static irqreturn_t mlink_data_irq(int irq, void *data)
 {
 	struct mlink_dev *mdev = data;
 
-	mlink_count_irq(mdev, MLINK_VEC_DATA);
-	if (READ_ONCE(mdev->dying))
+	atomic_long_inc(&mdev->irq_count[MLINK_VEC_DATA]);
+	if (!READ_ONCE(mdev->ready))
 		return IRQ_HANDLED;
 	/* We are about to poll: further kicks would be wasted interrupts. */
 	mlink_ring_disarm_kick(&mdev->rx);
-	queue_work(system_highpri_wq, &mdev->rx_work);
+	napi_schedule_irqoff(&mdev->napi);
 	return IRQ_HANDLED;
 }
 
@@ -66,16 +73,21 @@ static irqreturn_t mlink_space_irq(int irq, void *data)
 {
 	struct mlink_dev *mdev = data;
 
-	mlink_count_irq(mdev, MLINK_VEC_SPACE);
+	atomic_long_inc(&mdev->irq_count[MLINK_VEC_SPACE]);
+	if (!READ_ONCE(mdev->ready))
+		return IRQ_HANDLED;
+	mlink_net_space(mdev);
 	wake_up(&mdev->tx_wq);
 	return IRQ_HANDLED;
 }
 
 /* STATE only counts until the link state machine (P4). */
-
 static irqreturn_t mlink_state_irq(int irq, void *data)
 {
-	return mlink_count_irq(data, MLINK_VEC_STATE);
+	struct mlink_dev *mdev = data;
+
+	atomic_long_inc(&mdev->irq_count[MLINK_VEC_STATE]);
+	return IRQ_HANDLED;
 }
 
 static irqreturn_t mlink_test_irq(int irq, void *data)
@@ -84,7 +96,7 @@ static irqreturn_t mlink_test_irq(int irq, void *data)
 	u64 now = ktime_get_ns();	/* first thing: this is the RTT end point */
 
 	atomic_long_inc(&mdev->irq_count[MLINK_VEC_TEST]);
-	if (READ_ONCE(mdev->dying))
+	if (!READ_ONCE(mdev->ready))
 		return IRQ_HANDLED;
 
 	if (mdev->role == MLINK_ROLE_MODEM) {
@@ -176,7 +188,7 @@ static void mlink_state_publish(struct mlink_dev *mdev, enum mlink_link_state st
 
 	WRITE_ONCE(s->peer_id, mdev->own_id);
 	WRITE_ONCE(s->state, st);
-	WRITE_ONCE(s->mtu, 1500);
+	WRITE_ONCE(s->mtu, mdev->ndev->mtu);
 	virt_store_release(&s->magic, MLINK_STATE_MAGIC);
 }
 
@@ -209,24 +221,30 @@ static void mlink_link_work(struct work_struct *work)
 			WRITE_ONCE(mdev->peer_id, pid);
 			WRITE_ONCE(mdev->peer_found, true);
 			dev_info(dev, "peer found: id=%u gen=%u\n", pid, gen);
+			netif_carrier_on(mdev->ndev);
 		}
 	} else if (mdev->peer_found) {
 		WRITE_ONCE(mdev->peer_found, false);
 		dev_info(dev, "peer gone\n");
+		netif_carrier_off(mdev->ndev);
 	}
 
 	/*
-	 * Watchdog for lost DATA kicks: kick armed yet data waiting on two
-	 * consecutive polls (>= 100 ms) means a wakeup was lost. Count it and
-	 * recover, so a missing barrier shows up as a number, not a hang.
+	 * Watchdog for lost DATA kicks: kick armed, data waiting and NO progress
+	 * (rx index unchanged) across two polls (>= 100 ms) means a wakeup was
+	 * lost. "Armed + pending" alone is normal for the few microseconds
+	 * between a publish and its interrupt. Count it and recover, so a
+	 * missing barrier shows up as a number, not a hang.
 	 */
 	if (!READ_ONCE(mdev->rx_broken) && mlink_ring_kick_armed(&mdev->rx) &&
-	    mlink_ring_pending(&mdev->rx)) {
+	    mlink_ring_pending(&mdev->rx) &&
+	    (!mdev->rx_stall_seen || mdev->rx.idx == mdev->rx_stall_idx)) {
+		mdev->rx_stall_idx = mdev->rx.idx;
 		if (++mdev->rx_stall_seen >= 2) {
 			mdev->stats.rx_stalls++;
 			mdev->rx_stall_seen = 0;
 			mlink_ring_disarm_kick(&mdev->rx);
-			queue_work(system_highpri_wq, &mdev->rx_work);
+			mlink_napi_kick_local(mdev);
 		}
 	} else {
 		mdev->rx_stall_seen = 0;
@@ -256,7 +274,7 @@ static int mlink_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	init_completion(&mdev->pp.done);
 	mutex_init(&mdev->st.lock);
 	init_waitqueue_head(&mdev->tx_wq);
-	INIT_WORK(&mdev->rx_work, mlink_rx_work);
+	atomic_set(&mdev->tx_owner, MLINK_TX_FREE);
 	INIT_DELAYED_WORK(&mdev->link_work, mlink_link_work);
 
 	ret = pcim_enable_device(pdev);
@@ -311,6 +329,10 @@ static int mlink_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 			return dev_err_probe(dev, ret, "cannot request %s\n",
 					     mlink_irq_names[i]);
 	}
+
+	ret = mlink_net_init(mdev);
+	if (ret)
+		return dev_err_probe(dev, ret, "cannot register netdev\n");
 	pci_set_drvdata(pdev, mdev);
 
 	if (mdev->role == MLINK_ROLE_AP) {
@@ -324,13 +346,14 @@ static int mlink_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		mlink_state_publish(mdev, MLINK_ST_WAIT_PEER);
 
 	mlink_debugfs_init(mdev);
-	/* First consumer pass drains anything pending and arms the DATA kick. */
-	queue_work(system_highpri_wq, &mdev->rx_work);
+	WRITE_ONCE(mdev->ready, true);
+	/* First poll drains anything pending and arms the DATA kick. */
+	mlink_napi_kick_local(mdev);
 	schedule_delayed_work(&mdev->link_work, 0);
 
-	dev_info(dev, "role=%s own_id=%u gen=%u shm=%pa bytes\n",
-		 mlink_role_name(mdev->role), mdev->own_id,
-		 READ_ONCE(mdev->self->gen), &mdev->shm_len);
+	dev_info(dev, "%s: role=%s own_id=%u gen=%u shm=%pa bytes\n",
+		 netdev_name(mdev->ndev), mlink_role_name(mdev->role),
+		 mdev->own_id, READ_ONCE(mdev->self->gen), &mdev->shm_len);
 	return 0;
 }
 
@@ -349,13 +372,13 @@ static void mlink_remove(struct pci_dev *pdev)
 	virt_store_release(&mdev->self->magic, 0);
 
 	/*
-	 * Free the handlers now rather than at devres time so no irq can run
-	 * past this point; vectors and mappings are released by devres after.
+	 * Free the handlers now rather than at devres time: after this no irq
+	 * can schedule NAPI or touch the netdev we are about to free.
 	 */
+	WRITE_ONCE(mdev->ready, false);
 	for (i = 0; i < MLINK_NR_VECTORS; i++)
 		devm_free_irq(&pdev->dev, pci_irq_vector(pdev, i), mdev);
-	/* After the irqs (which queue it) and the link work (which may too). */
-	cancel_work_sync(&mdev->rx_work);
+	mlink_net_exit(mdev);
 	dev_info(&pdev->dev, "removed\n");
 }
 

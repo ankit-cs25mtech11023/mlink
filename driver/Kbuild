@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-only
 obj-m := mlink.o
-mlink-y := mlink_main.o mlink_debugfs.o mlink_ring.o mlink_selftest.o
+mlink-y := mlink_main.o mlink_debugfs.o mlink_ring.o mlink_selftest.o mlink_net.o
 
 # Kernel APIs change between releases; turn every warning into a build failure.
 ccflags-y += -Werror

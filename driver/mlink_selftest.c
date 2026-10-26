@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Ring consumer work and the ring selftest (P2.3).
+ * Ring consumer (called from NAPI poll) and the ring selftest (P2.3).
  *
  * The producer pushes sequence-numbered messages whose length and payload are
  * derived from the sequence number with xorshift32, so the consumer can verify
@@ -110,8 +110,10 @@ int mlink_rx_poll(struct mlink_dev *mdev, int budget)
 			mdev->stats.rx_len_errors++;
 		else if (d.proto == MLINK_PROTO_TEST)
 			mlink_selftest_rx(mdev, &d);
+		else if (d.proto == MLINK_PROTO_IPV4 || d.proto == MLINK_PROTO_IPV6)
+			mlink_net_rx(mdev, &d);
 		else
-			mdev->stats.rx_proto_errors++;	/* P3: hand IP packets to the stack */
+			mdev->stats.rx_proto_errors++;
 
 		mlink_ring_consume(r);
 		done++;
@@ -126,27 +128,6 @@ int mlink_rx_poll(struct mlink_dev *mdev, int budget)
 		}
 	}
 	return done;
-}
-
-void mlink_rx_work(struct work_struct *work)
-{
-	struct mlink_dev *mdev = container_of(work, struct mlink_dev, rx_work);
-	int done;
-
-	if (READ_ONCE(mdev->dying) || READ_ONCE(mdev->rx_broken))
-		return;
-
-	done = mlink_rx_poll(mdev, MLINK_RX_BUDGET);
-	if (done == MLINK_RX_BUDGET) {
-		/* More work: requeue instead of looping, so others get the CPU. */
-		queue_work(system_highpri_wq, &mdev->rx_work);
-		return;
-	}
-	/* Going idle: arm the DATA kick, then re-check (lost-wakeup race). */
-	if (mlink_ring_arm_kick(&mdev->rx, !unsafe_no_mb)) {
-		mlink_ring_disarm_kick(&mdev->rx);
-		queue_work(system_highpri_wq, &mdev->rx_work);
-	}
 }
 
 /* ---- producer ------------------------------------------------------------ */
@@ -205,6 +186,9 @@ int mlink_selftest_tx(struct mlink_dev *mdev, u32 n)
 
 	if (!READ_ONCE(mdev->peer_found))
 		return -ENOTCONN;
+	/* One producer per ring: refuse while mlink0 is up. */
+	if (atomic_cmpxchg(&mdev->tx_owner, MLINK_TX_FREE, MLINK_TX_SELFTEST) != MLINK_TX_FREE)
+		return -EBUSY;
 
 	mutex_lock(&st->lock);
 	st->tx_space_waits = 0;
@@ -235,5 +219,6 @@ int mlink_selftest_tx(struct mlink_dev *mdev, u32 n)
 	mdev->stats.tx_kicks += kicks;
 	mdev->stats.tx_kick_suppressed += supp;
 	mutex_unlock(&st->lock);
+	atomic_set(&mdev->tx_owner, MLINK_TX_FREE);
 	return ret;
 }

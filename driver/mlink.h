@@ -6,6 +6,8 @@
 #include <linux/atomic.h>
 #include <linux/completion.h>
 #include <linux/mutex.h>
+#include <linux/netdevice.h>
+#include <linux/u64_stats_sync.h>
 #include <linux/pci.h>
 #include <linux/wait.h>
 #include <linux/workqueue.h>
@@ -55,6 +57,10 @@ struct mlink_stats {
 	u64 rx_len_errors;		/* consumer work: invalid desc len */
 	u64 rx_proto_errors;		/* consumer work: unknown proto */
 	u64 rx_stalls;			/* link work: armed but data waiting (lost DATA kick) */
+	u64 tx_queue_stops;		/* xmit: ring full, queue stopped */
+	u64 tx_queue_wakes;		/* xmit/SPACE irq: queue woken */
+	u64 napi_polls;			/* NAPI */
+	u64 napi_budget_exhausted;	/* NAPI: poll used its whole budget */
 	u64 space_kicks;		/* consumer work: SPACE kicks sent */
 	u64 ring_corruptions;		/* impossible prod/cons seen */
 };
@@ -73,6 +79,21 @@ struct mlink_selftest {
 	u64 rx_first_ns, rx_last_ns;
 };
 
+/* netdev packet counters; one writer context each, read under syncp. */
+struct mlink_netstats {
+	u64 packets;
+	u64 bytes;
+	u64 dropped;
+	struct u64_stats_sync syncp;
+};
+
+/* Who may produce on the TX ring (SPSC: exactly one producer at a time). */
+enum {
+	MLINK_TX_FREE,
+	MLINK_TX_NETDEV,
+	MLINK_TX_SELFTEST,
+};
+
 struct mlink_dev {
 	struct pci_dev *pdev;
 	enum mlink_role role;
@@ -88,14 +109,22 @@ struct mlink_dev {
 	u32 peer_id;			/* learned from the peer's state block */
 	bool hdr_ok;			/* modem: header validated */
 	bool peer_found;
-	bool dying;			/* set first in remove(); irq handlers check it */
+	bool ready;			/* probe finished; irq handlers do nothing until then */
+	bool dying;			/* set first in remove() */
 
 	struct mlink_ring tx;		/* we produce */
 	struct mlink_ring rx;		/* we consume */
 	bool rx_broken;			/* corruption seen; stop consuming (P4 resets) */
-	u32 rx_stall_seen;		/* link work: consecutive "armed but pending" polls */
-	struct work_struct rx_work;	/* consumer (becomes NAPI poll in P3) */
-	wait_queue_head_t tx_wq;	/* woken by the SPACE irq */
+	u32 rx_stall_seen;		/* link work: consecutive "armed, pending, no progress" polls */
+	u32 rx_stall_idx;		/* link work: rx.idx at the first such poll */
+	wait_queue_head_t tx_wq;	/* selftest producer, woken by the SPACE irq */
+	atomic_t tx_owner;		/* MLINK_TX_* */
+	u32 tx_seq;
+
+	struct net_device *ndev;
+	struct napi_struct napi;
+	struct mlink_netstats rx_stats;	/* NAPI context */
+	struct mlink_netstats tx_stats;	/* xmit context */
 
 	struct delayed_work link_work;	/* peer discovery, later heartbeat (P4) */
 	atomic_long_t irq_count[MLINK_NR_VECTORS];
@@ -111,9 +140,14 @@ void mlink_debugfs_init(struct mlink_dev *mdev);
 void mlink_debugfs_exit(struct mlink_dev *mdev);
 
 /* mlink_selftest.c: ring consumer + selftest */
-void mlink_rx_work(struct work_struct *work);
 int mlink_rx_poll(struct mlink_dev *mdev, int budget);
 int mlink_selftest_tx(struct mlink_dev *mdev, u32 n);
+
+/* mlink_net.c */
+int mlink_net_init(struct mlink_dev *mdev);
+void mlink_net_exit(struct mlink_dev *mdev);
+void mlink_net_rx(struct mlink_dev *mdev, const struct mlink_rx_desc *d);
+void mlink_net_space(struct mlink_dev *mdev);
 
 static inline const char *mlink_role_name(enum mlink_role role)
 {
