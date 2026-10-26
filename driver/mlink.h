@@ -30,6 +30,7 @@ extern bool kick_suppress;
 extern bool unsafe_no_mb;
 extern unsigned int hb_ms;
 extern unsigned int hb_timeout_ms;
+extern unsigned int napi_weight;
 
 enum mlink_reset_reason {
 	MLINK_RESET_HB_TIMEOUT,

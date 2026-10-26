@@ -619,7 +619,9 @@ Every phase ends with: walkthrough doc → study gate → commit (+ push once re
 - **P6.4 Experiment matrix** (`bench/run_*.sh` → CSV in `bench/results/`):
   1. Doorbell RTT (P1 pingpong) on perf kernel.
   2. TCP/UDP throughput vs MTU (576, 1500, 4000) and direction.
-  3. Throughput vs ring size (64/256/1024) and NAPI weight (8/64/256).
+  3. Throughput vs NAPI weight (8/16/32/64 — the NAPI core logs an error above 64,
+     `NAPI_POLL_WEIGHT`). Ring-size sweep deferred: needs a configurable shm layout (stretch;
+     decided 2026-10-27, D16).
   4. Latency: interrupt mode vs kick-suppression vs busy-poll (`net.core.busy_poll` /
      `SO_BUSY_POLL`).
   5. Interrupts per packet & CPU% vs offered load (show mitigation working).
@@ -757,6 +759,10 @@ For each phase N:
   P1.1 design review or per-phase study gates. Reviews and study gates are still required and
   stay unticked in checkbox.md until the user does them (in batches, after implementation);
   walkthrough docs are written per phase as before so the study material is ready.
+- **D16 (2026-10-27)** P6 sweep: NAPI weight 8/16/32/64 (not 256 — above `NAPI_POLL_WEIGHT`
+  the core logs an error); ring-size sweep deferred until the layout is configurable. Benchmarks
+  run with turbo OFF (fixed 1.6 GHz) for thermal safety and low variance — absolute numbers are
+  therefore conservative; stated in results.md.
 - **D14 (2026-10-27)** Guest kernel = **v6.18.59** (latest 6.18 longterm per kernel.org
   releases.json on 2026-10-27; 7.2.13 stable / 7.3 mainline not chosen — LTS for stable APIs).
   QEMU source 10.2.2, GPG signature verified (key CEACC9E15534EBABB82D3FA03353C9CEF108B584),

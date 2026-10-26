@@ -404,7 +404,9 @@ int mlink_net_init(struct mlink_dev *mdev)
 	u64_stats_init(&mdev->rx_stats.syncp);
 	u64_stats_init(&mdev->tx_stats.syncp);
 
-	netif_napi_add(ndev, &mdev->napi, mlink_napi_poll);
+	/* Budget per poll (P6 sweep); clamp to what the NAPI core accepts. */
+	netif_napi_add_weight(ndev, &mdev->napi, mlink_napi_poll,
+			      clamp_val(napi_weight, 1, NAPI_POLL_WEIGHT));
 	netif_carrier_off(ndev);	/* on when the peer is found */
 
 	ret = register_netdev(ndev);

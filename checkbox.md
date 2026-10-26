@@ -68,14 +68,14 @@
 - [x] P5.3 Make driver checkpatch --strict, sparse (C=1) and W=1 clean
 - [ ] P5.4 (optional) Build KCSAN kernel and run soak
 - [ ] P5.5 Pass 1-hour soak with traffic + chaos + periodic SSR (dmesg gate clean)
-- [ ] P5.6 Write `docs/walkthrough/phase5.md`
+- [x] P5.6 Write `docs/walkthrough/phase5.md`
 - [ ] P5.7 Study gate 5 passed (untrusted input, fault injection, static analysis, sanitizers)
 
 ## Phase 6: Measurements, results & write-up → MVP
 - [ ] P6.1 Build perf kernel (no debug options), boot VMs on it, rebuild module against it
 - [ ] P6.2 Write bench-prep/restore (stop background apps, governor via NOPASSWD script, CPU pinning, repetitions) and restore afterwards
 - [ ] P6.3 Write `tools/udp_pingpong.c` latency tool (histogram percentiles, CSV, optional SO_BUSY_POLL)
-- [ ] P6.4 Run experiment matrix (doorbell RTT, throughput vs MTU/ring/NAPI weight, latency modes, IRQs/packet vs load, SSR times, profile breakdown)
+- [ ] P6.4 Run experiment matrix (doorbell RTT, throughput vs MTU/NAPI weight, latency modes, IRQs/packet vs load, SSR times, profile breakdown)
 - [ ] P6.5 Create Windows `.venv` + pinned `bench/requirements.txt`, write `bench/plot.py`, and generate plots into docs/img
 - [ ] P6.6 Write `docs/results.md` (methodology + caveats) and full README (diagram, how to run, results, prior art, limitations)
 - [ ] P6.7 Fill the resume bullet from measured numbers and get user approval

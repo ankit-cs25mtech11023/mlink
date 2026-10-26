@@ -43,6 +43,10 @@ unsigned int hb_timeout_ms = 500;
 module_param(hb_timeout_ms, uint, 0644);
 MODULE_PARM_DESC(hb_timeout_ms, "Peer declared lost after this long without a heartbeat (default 500)");
 
+unsigned int napi_weight = NAPI_POLL_WEIGHT;
+module_param(napi_weight, uint, 0444);
+MODULE_PARM_DESC(napi_weight, "NAPI poll budget, 1..64 (default 64)");
+
 static enum mlink_role mlink_role;
 
 void mlink_kick(struct mlink_dev *mdev, enum mlink_vector vec)

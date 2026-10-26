@@ -31,3 +31,4 @@ __pycache__/
 .idea/
 Thumbs.db
 tools/udp_pingpong
+.venv/
