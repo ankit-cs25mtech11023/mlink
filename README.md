@@ -23,8 +23,23 @@ shared memory**, and **subsystem-restart (SSR) recovery** when the other side di
 
 ## Status
 
-Phases 0–5 implemented and tested on a **debug kernel** (KASAN, lockdep, kmemleak).
-Phase 6 (perf-kernel measurements) in progress. See [`checkbox.md`](checkbox.md).
+Phases 0–6 implemented. Correctness tested on a debug kernel (KASAN, lockdep, kmemleak);
+numbers measured on a perf kernel. Full methodology and caveats: [`docs/results.md`](docs/results.md).
+
+## Results (perf kernel, laptop CPU fixed at 1.6 GHz, medians of 5)
+
+| What | Result |
+|---|---|
+| TCP throughput, MTU 1500 / 4000 | **7.2 / 9.9 Gbit/s** (AP→modem), 2 retransmits in 30 runs |
+| Doorbell round trip (IRQ→IRQ) | **13.1 µs** p50, 22.5 µs p99, 0 lost / 50 000 |
+| UDP 64 B request/response | **44 µs** p50 with interrupts, **15.5 µs** p50 with busy-poll |
+| Interrupt mitigation | 1.0 → **0.47** RX interrupts per packet from light to full load |
+| Subsystem restart, both drivers, live TCP | **90 ms** outage, TCP survives |
+| Peer VM killed | detected **520 ms** after its last heartbeat; re-handshake with the new peer ID |
+| Shared-memory corruption (1 201 ops, 7 modes) | no crash, KASAN clean, recovery ≤ 3.2 s |
+
+![throughput vs MTU](docs/img/e2_mtu_perf.png)
+![latency](docs/img/e4_latency_perf.png)
 
 ## What's in it
 
@@ -41,21 +56,6 @@ Phase 6 (perf-kernel measurements) in progress. See [`checkbox.md`](checkbox.md)
 - **Hardening**: host-side **shared-memory corruption injector** (`tools/shm_chaos.c`),
   driver fault knobs, lost-kick watchdogs on local facts only, header self-repair;
   `checkpatch --strict`, sparse and `W=1` clean.
-
-## Results so far (debug kernel — not headline numbers)
-
-| What | Result | Source |
-|---|---|---|
-| Doorbell round trip (IRQ→IRQ) | p50 8–12 µs, 0 lost / 15 000 | `bench/results/p1-doorbell-rtt-debug.txt` |
-| Ring selftest, 10 M msgs each way | 0 lost/dup/corrupt; kick suppression 2.9× msgs/s with ~3000× fewer interrupts | `bench/results/p2-selftest-debug.txt` |
-| LKMM litmus | publish / slot-reuse / kick: *Never*; each barrier removed: *Sometimes* | `litmus/herd7-results.txt` |
-| 10-min soak (bidir TCP + ping flood + 105 link flaps) | clean dmesg gate, 0 stalls/corruptions | `bench/results/p3-soak-debug.txt` |
-| SSR: modem / AP / both driver restarts under TCP | TCP survives, 1.3–2.1 s outage; 100/100 restarts | `bench/results/p4-ssr-debug.txt` |
-| SSR: modem VM `kill -9` | detected at 520 ms heartbeat age, re-handshake with new peer ID | `bench/results/p4-ssr-debug.txt` |
-| shm_chaos, 7 modes, 1201 corruptions under TCP | no crash, KASAN clean, all recover ≤ 3.2 s | `bench/results/p5-chaos-debug.txt` |
-
-Debug-kernel TCP throughput (~47 Mbit/s) is bound by the KASAN-instrumented sender, not the
-link; perf-kernel numbers will replace it.
 
 ## How to run
 
