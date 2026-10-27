@@ -34,6 +34,7 @@ numbers measured on a perf kernel. Full methodology and caveats: [`docs/results.
 | Doorbell round trip (IRQ→IRQ) | **13.1 µs** p50, 22.5 µs p99, 0 lost / 50 000 |
 | UDP 64 B request/response | **44 µs** p50 with interrupts, **15.5 µs** p50 with busy-poll |
 | Interrupt mitigation | 1.0 → **0.47** RX interrupts per packet from light to full load |
+| TCP after checksum offload across the link (D17) | **7.8 / 11.1 Gbit/s** at MTU 1500 / 4000 |
 | Subsystem restart, both drivers, live TCP | **90 ms** outage, TCP survives |
 | Peer VM killed | detected **520 ms** after its last heartbeat; re-handshake with the new peer ID |
 | Shared-memory corruption (1 201 ops, 7 modes) | no crash, KASAN clean, recovery ≤ 3.2 s |
@@ -53,6 +54,9 @@ numbers measured on a perf kernel. Full methodology and caveats: [`docs/results.
 - **Link state machine & SSR** (`mlink_link.c`): two-way generation handshake, heartbeat or
   ring-progress liveness, reset that quiesces the data path without locks in it, STATE-vector
   fast path for graceful restarts.
+- **Control plane** (`mlink_ctrl.c`): `/dev/mlink_ctrl` with QMI-like request/response/
+  indication messages over two more rings and a 5th MSI-X vector; `mlinkd` (modem daemon) and
+  `mlinkctl` (AP CLI); SSR-aware (pending requests fail with `ENOTCONN`), unbind-safe lifetime.
 - **Hardening**: host-side **shared-memory corruption injector** (`tools/shm_chaos.c`),
   driver fault knobs, lost-kick watchdogs on local facts only, header self-repair;
   `checkpatch --strict`, sparse and `W=1` clean.

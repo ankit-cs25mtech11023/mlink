@@ -61,13 +61,15 @@ registered). The **AP owns the global header**; the data path is symmetric.
 | `0x003000` | 4 KiB | ring A descriptors `desc[256]` × 16 B | AP |
 | `0x004000` | 1 MiB | ring A slots `slot[256]` × 4 KiB | AP |
 | `0x104000` | | ring B (MODEM→AP): same structure | modem / AP |
-| `0x206000` | ~1.98 MiB | reserved (stretch: control rings) | — |
+| `0x206000` | 24 KiB | control ring C (AP→MODEM): 16 × 1 KiB slots | AP / modem (split) |
+| `0x20C000` | 24 KiB | control ring D (MODEM→AP) | modem / AP |
+| `0x212000` | ~1.9 MiB | reserved | — |
 
 `N = 256` (power of two), slot = 4096 B → MTU ≤ 4096. The tool `shm_chaos` includes this same
 header (userspace-safe), so layout drift between tool and driver is a compile error.
 
 ### 4.1 Global header (64 B)
-`magic` "MLNK", `abi_version` (**2**), `ring_entries`, `slot_size`, `ring_a_off`, `ring_b_off`,
+`magic` "MLNK", `abi_version` (**3**: v2 added checksum offload, v3 control rings), `ring_entries`, `slot_size`, `ring_a_off`, `ring_b_off`,
 `layout_crc` = `crc32_le` over `abi_version..ring_b_off`.
 - **Publish (AP):** `magic = 0`, `virt_wmb()`, write fields, `virt_store_release(magic)`.
 - **Validate:** `virt_load_acquire(magic)`, read every field once into a local, compare all
@@ -154,6 +156,7 @@ The peer may be buggy, crashed mid-write, or hostile; `tools/shm_chaos` attacks 
 | 1 SPACE | I freed slots in your TX ring | wake netdev queue if stopped + space; wake selftest `tx_wq` |
 | 2 STATE | my state block changed | `mod_delayed_work(link_work, 0)` |
 | 3 TEST | ping-pong | modem: kick back; AP: timestamp, `complete()` |
+| 4 CTRL | control ring: new message and/or space freed | queue control RX work, wake blocked writers |
 
 All handlers do nothing until `ready` (set last in probe, cleared first in remove).
 
@@ -236,6 +239,14 @@ Rule: stop everything that can create new work before freeing what that work use
   `fault_delay_kick_us`, `fault_corrupt_tx_len`.
 - Tracepoints `mlink:mlink_{xmit,kick,irq,napi_poll,rx,link}`.
 - Host-side `tools/shm_chaos` (flip / len / idx / flags / magic / hb / mix).
+
+## 12a. Control plane (P7, D18) — details in `docs/walkthrough/phase7.md`
+`/dev/mlink_ctrl` (misc device): QMI-like header + TLVs (`driver/mlink_ctrl.h`, shared with
+userspace). AP kernel assigns `txn_id` and routes RESP to the requesting file; IND goes to all
+files; per-file queue bounded at 64. One mutex covers the control TX producer, the RX work, the
+txn table and the file list. Control state is kref'd so open files survive an unbind (`dead`
+→ `ENODEV`). On link reset: pending requests get RESP `-ENOTCONN`, rings zeroed, readers
+`EPOLLHUP`. Daemon `mlinkd` (modem) and CLI `mlinkctl` (AP).
 
 ## 13. Known limitations
 Fixed layout (no ring-size negotiation); two copies per packet; single queue per direction;
