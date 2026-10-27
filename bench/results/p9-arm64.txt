@@ -1,0 +1,41 @@
+# P9.2 x86 AP <-> arm64 modem — 2026-10-27T17:04:17+05:30
+# AP: 6.18.59-mlink-debug (KVM)   modem: 
+6.18.59-mlink-arm64 aarch64 (TCG, -cpu max, MTTCG, 2 vCPU)
+# command: bash bench/run_p9_arm64.sh 1000000
+
+== ring selftest ap -> arm, N=1000000, kick_suppress=1
+producer (x86):   tx_sent 1000000 err 0 ns 8874936968 msgs_per_s 112676 kicks 62 suppressed 999938 space_waits 15614 lost_space_wakeups 0 kick_suppress 1 unsafe_no_mb 0
+consumer (arm64): 
+rx_ok 1000000 lost 0 dup_ooo 0 corrupt 0 next_seq 1000000 msgs_per_s 112653
+== ring selftest arm -> ap, N=1000000, kick_suppress=1
+producer (arm64): 
+tx_sent 1000000 err 0 ns 5978001242 msgs_per_s 167279 kicks 269784 suppressed 730216 space_waits 1 lost_space_wakeups 0 kick_suppress 1 unsafe_no_mb 0
+consumer (x86):   rx_ok 1000000 lost 0 dup_ooo 0 corrupt 0 next_seq 1000000 msgs_per_s 167293
+AP stats: rx_stalls              0 ring_corruptions       0 link_resets            6 
+
+== ping x86 -> arm64
+50 packets transmitted, 50 received, 0% packet loss, time 2485ms
+rtt min/avg/max/mdev = 0.998/1.530/15.963/2.079 ms
+rtt min/avg/max/mdev = 1.674/2.742/13.174/2.425 ms
+== ping arm64 -> x86
+
+20 packets transmitted, 20 packets received, 0% packet loss
+round-trip min/avg/max = 1.710/2.258/7.027 ms
+== flood x86 -> arm64 (nstat deltas)
+5025 packets transmitted, 5025 received, 0% packet loss, time 1855ms
+IcmpInEchoReps                  5025               0.0
+IcmpOutEchos                    5025               0.0
+== arm64 rmmod/insmod x20 (AP must re-handshake each time)
+
+reload-loop ok
+AP link_ups +20
+5 packets transmitted, 5 received, 0% packet loss, time 803ms
+== SSR: kill the arm64 VM (no restart), AP detection
+link_resets:     27 (hb_timeout 7, peer_gen 0, peer_down 20, ring 0)
+last_hb_age_ms:  520
+[24746.855659] mlink 0000:00:05.0: link reset: heartbeat timeout (was UP)
+== restart arm64 VM
+[24755.755316] mlink 0000:00:05.0: link UP: peer id=38 gen=57, own gen=62 (recovery 8899506 us)
+5 packets transmitted, 5 received, 0% packet loss, time 803ms
+== arm64 dmesg warnings/oopses
+0

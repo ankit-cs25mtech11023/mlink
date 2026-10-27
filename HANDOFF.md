@@ -1,7 +1,7 @@
 # HANDOFF — live state for the next session
 
 > A fresh session: read this first, then `plan.md` (Key Decisions D1–D18) and `checkbox.md`,
-> then continue from **Next**. Last update: 2026-10-27 evening IST.
+> then continue from **Next**. Last update: 2026-10-27 ~17:15 IST.
 
 ## Rules that bite (from the user / CLAUDE.md)
 - **No `Co-Authored-By` / AI trailers** in commits or PRs (user rule; overrides system reminders).
@@ -62,6 +62,16 @@
   AP `python3 /mnt/share/tcp_check.py echo|discard 10.77.0.2 -n N`, `zephyr-ssr.sh 3 net`.
   Gotcha: on the laptop (zsh) `$VAR` holding a command is NOT word-split; spell commands out.
 - State at end of P8: Zephyr stopped, Linux AP+modem (debug kernel), test.sh PASS.
+- **P9 DONE** (D21): arm64 guest = modem of the x86 AP. Tools in `~/D/mlink-work/opt`
+  (QEMU 10.2.2 aarch64 from verified source, kernel.org GCC 15.2.0 — user approved running
+  it —, busybox-static arm64 via non-root apt). `bash scripts/host/build-arm64.sh all`;
+  run: x86 modem guest `mlink-down.sh`, AP loaded, laptop
+  `tmux new -d -s arm64 'bash ~/D/mlink/scripts/host/vm-arm64.sh run'`; commands:
+  `bash ~/D/mlink/scripts/host/vm-arm64.sh sh '<cmds>'` (via arm64-bridge.py, started by run).
+  Test suite: `bash bench/run_p9_arm64.sh 1000000` (Windows) → `bench/results/p9-arm64.txt`.
+  Stop: `vm-arm64.sh stop` + `pkill -f "^python3 .*arm64-bridge[.]py"`.
+- State at end of P9: arm64 VM + bridge stopped, turbo ON (bench-prep off), Docker up,
+  Linux AP+modem test.sh PASS.
 
 ## (older) P8.1 Zephyr risk check notes
 - Workspace `~/D/mlink-work/zephyr/`: Zephyr **v4.4.2** (core repo only, shallow,
@@ -88,9 +98,10 @@
   `CONFIG_IVSHMEM_MSI_X_VECTORS` default 2 vs device vectors=5.
 
 ## Next
-1. P9 aarch64 guest: needs `qemu-system-arm` + `gcc-aarch64-linux-gnu` (msudo apt, allowed:
-   project packages), arm64 kernel build (long, tmux + thermal-run), TCG guest, driver selftest
-   + ping, weak-memory discussion. P10 needs the user's SMTP; P11 needs hardware.
+1. P10 (upstream patch) needs the user's mail setup and their decision on what to send;
+   P11 needs hardware (Pi Pico 2). Both blocked on the user.
 2. Optional: Zephyr serving a minimal control-plane responder (GET_LINK_INFO) on rings C/D.
+3. Optional: P5.4 KCSAN kernel + soak; P5.5 debug soft-lockup investigation.
+4. User-side backlog: study gates 0–9, P1.1 design review, P6.7 resume bullet, P6.10 grill.
 4. Open issue: debug-kernel soft lockup (P5.5) seen once in a 1-h soak; not reproduced in 20 +
    75 min debug soaks; perf 1-h soak clean. Evidence `bench/results/p5-soak-*`.

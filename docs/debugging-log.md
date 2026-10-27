@@ -135,3 +135,25 @@ Format: symptom → hypotheses → evidence → root cause → fix → lesson. N
   second of recovery, 0 resets; full campaign: all 7 modes recover in ≤ 3.2 s.
 - **Lesson:** "untrusted shared memory" applies to *control* decisions too (watchdogs,
   liveness), not just lengths and indices. A fault injector finds what code review missed.
+
+## 2026-10-27 — P9: control shell to the arm64 initramfs guest loses or delays commands
+
+- **Symptom:** commands sent to the arm64 guest's shell came back late (the output of call N
+  arrived with call N+1), timed out, or were lost; exit codes were attributed to the wrong call.
+- **Hypotheses, in order:** (1) busybox `ash` echo → yes, its line editor echoes on a tty even
+  with `stty -echo`; fixed by feeding sh through a pipe. (2) `stty` lost → yes, settings reset
+  when the tty is closed; apply on the fd that stays open. (3) host reconnects → yes, a
+  virtio-console disconnect hangs up hvc0 in the guest, so input around reconnects was lost;
+  fixed with a persistent bridge (`scripts/host/arm64-bridge.py`). (4) still timing out →
+  probe on the raw socket showed **a one-line lag**: a command ran only when the next line
+  arrived.
+- **Root cause (4):** not fully pinned down — the last line (or its output) on the guest's
+  serial path under TCG only moved on further input. Same behaviour on virtio console and
+  PL011, so likely in the tty/console path rather than one device model.
+- **Fix:** the bridge sends an empty line (a no-op for sh) after every 1 s without output.
+  Verified: `uname`, `false` (rc 1), multi-command batches, the full P9 run.
+- **Side lessons:** `pkill -f pattern` / `pgrep -f` over ssh match the `zsh -c` command line
+  that contains the pattern (killed my own ssh session once): anchor the pattern
+  (`"^python3 .*arm64-bridge[.]py"`). zsh does not word-split `$VAR`, so options in a variable
+  arrive as one argument: put such commands in bash scripts.
+- **Time:** ~45 min, under the 2 h timebox.

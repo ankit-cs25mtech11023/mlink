@@ -1,0 +1,14 @@
+# P9: what the virt_* barriers in driver/mlink_ring.c compile to on arm64
+# cmd: aarch64-linux-objdump -d build/mlink-arm64/mlink_ring.o   (kernel.org GCC 15.2.0, 6.18.59-mlink-arm64)
+
+stlr (store-release): 2   ldar (load-acquire): 3   dmb ish (full barrier): 4
+
+<mlink_ring_free>:	ldar	w2, [x1]
+<mlink_ring_publish>:	stlr	w1, [x0]
+<mlink_ring_need_kick>:	dmb	ish
+<mlink_ring_arm_space>:	dmb	ish
+<mlink_ring_arm_space>:	ldar	w2, [x1]
+<mlink_ring_peek>:	ldar	w4, [x2]
+<mlink_ring_release>:	stlr	w0, [x1]
+<mlink_ring_need_space_kick>:	dmb	ish
+<mlink_ring_arm_kick>:	dmb	ish

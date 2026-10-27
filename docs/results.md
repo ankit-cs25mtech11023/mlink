@@ -184,6 +184,16 @@ ping and UDP echo (0 lost), TCP echo 4 MiB byte-exact, TCP discard 32 MiB at ~6 
 (TCG-bound: the Zephyr QEMU used 128 % of a core), SSR recovery 39–51 ms, and a TCP connection
 open across a modem crash ends with ECONNRESET ~2 s after the restart.
 
+## P9 — arm64 modem against the x86 AP (`bench/results/p9-arm64.txt`)
+
+The same driver source cross-built for arm64 (kernel.org GCC 15.2.0, minimal 6.18.59 kernel)
+and run as the modem under TCG against the x86 KVM AP on one shared region
+(`bash bench/run_p9_arm64.sh 1000000`): ring selftest 1 M messages each way with 0 lost / dup /
+corrupt, ping both ways incl. fragments, flood 5 025/5 025, 20 rmmod/insmod cycles with 20
+re-handshakes, VM kill detected at 520 ms. The barriers compile to `stlr` ×2, `ldar` ×3,
+`dmb ish` ×4 (`p9-arm64-barriers.txt`). TCG on an x86 host does not reproduce ARM
+reorderings; ordering correctness rests on the LKMM litmus tests.
+
 ## Correctness evidence (debug kernel)
 
 | test | result | file |

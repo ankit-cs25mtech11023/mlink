@@ -23,7 +23,8 @@ shared memory**, and **subsystem-restart (SSR) recovery** when the other side di
 
 ## Status
 
-Phases 0–7 implemented, plus a Zephyr modem (P8.1–P8.2). Correctness tested on a debug kernel (KASAN, lockdep, kmemleak);
+Phases 0–9 implemented: control plane, a Zephyr modem (loopback and full IP stack), and an
+arm64 modem against the x86 AP. Correctness tested on a debug kernel (KASAN, lockdep, kmemleak);
 numbers measured on a perf kernel. Full methodology and caveats: [`docs/results.md`](docs/results.md).
 
 ## Results (perf kernel, laptop CPU fixed at 1.6 GHz, medians of 5)
@@ -63,6 +64,8 @@ numbers measured on a perf kernel. Full methodology and caveats: [`docs/results.
   restarts detected by the AP via generation change (recovery 44–53 ms) or heartbeat (521 ms).
   Or, built with `net.conf`, the ring pair becomes a raw-IP Zephyr network interface with the
   real Zephyr TCP/IP stack (TCP echo verified byte-exact, UDP echo, ping).
+- **arm64**: the same driver cross-built for arm64 runs as the modem of the x86 AP on one shared
+  region (ring selftest 1 M msgs each way, 0 errors; `virt_*` → `stlr`/`ldar`/`dmb ish`).
 - **Hardening**: host-side **shared-memory corruption injector** (`tools/shm_chaos.c`),
   driver fault knobs, lost-kick watchdogs on local facts only, header self-repair;
   `checkpatch --strict`, sparse and `W=1` clean.

@@ -40,7 +40,9 @@ kernel() {
 	done < "$CFG"
 	[ $bad -eq 0 ] && echo "config check: all requested options present"
 	local start; start=$(date +%s)
-	nice -n 10 "${KMAKE[@]}" O="$B" -j"$JOBS" Image modules_prepare
+	# "modules" (even with none configured) runs modpost on vmlinux and writes
+	# Module.symvers, which the out-of-tree mlink.ko needs to resolve exports.
+	nice -n 10 "${KMAKE[@]}" O="$B" -j"$JOBS" Image modules
 	echo "arm64 kernel done in $(( ($(date +%s) - start) / 60 )) min: $("${KMAKE[@]}" -s O="$B" kernelrelease)"
 	ls -l "$B/arch/arm64/boot/Image"
 }
