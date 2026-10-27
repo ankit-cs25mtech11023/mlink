@@ -135,8 +135,9 @@ def e5():
     fig, axes = plt.subplots(1, 2, figsize=(9, 3.4))
     for ax, col, lab, color in ((axes[0], "irqs_per_pkt", "RX interrupts per packet", S1),
                                 (axes[1], "modem_cpu_busy_pct", "modem guest CPU busy %", S3)):
-        y = by[col].median()
-        ax.plot(x.values, y.values, color=color, linewidth=2, marker="o", markersize=7,
+        # offered=0 means "unlimited": order points by the load actually received.
+        pts = pd.DataFrame({"x": x, "y": by[col].median()}).sort_values("x")
+        ax.plot(pts.x.values, pts.y.values, color=color, linewidth=2, marker="o", markersize=7,
                 markeredgecolor=SURFACE, markeredgewidth=2)
         ax.set_xlabel("received UDP load, Mbit/s (1400 B)")
         ax.set_title(lab, loc="left")

@@ -17,14 +17,25 @@ REPS=${1:-5}
 SECS=${2:-10}
 REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 PY="$REPO/.venv/Scripts/python"
-[ -x "$PY" ] || PY=python
-KREL=$(ssh mlink-ap uname -r)
+[ -x "$PY" ] || PY=python3
+# ON_HOST=1: run on the KVM host itself (in tmux), independent of the Windows PC.
+if [ -n "${ON_HOST:-}" ]; then
+	g() {
+		local port=2221
+		[ "$1" = modem ] && port=2222
+		ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null 		    -o LogLevel=ERROR -p $port root@127.0.0.1 "${@:2}"
+	}
+	host() { bash -c "$*"; }
+else
+	g() { ssh -o BatchMode=yes "mlink-$1" "${@:2}"; }
+	host() { ssh kali "$*"; }
+fi
+KREL=$(g ap uname -r)
 FLAV=${KREL##*-}
-OUT="$REPO/bench/results/$FLAV"
+OUT=${OUTDIR:-"$REPO/bench/results/$FLAV"}
 mkdir -p "$OUT"
 RAW="$OUT/matrix-raw.log"
 D=/sys/kernel/debug/mlink
-g() { ssh -o BatchMode=yes "mlink-$1" "${@:2}"; }
 log() { echo "$(date +%T) $*" | tee -a "$RAW"; }
 up() {	# (re)load both sides with optional module params, wait for UP
 	for vm in ap modem; do g $vm "bash /mnt/share/mlink-down.sh >/dev/null; bash /mnt/share/mlink-up.sh $vm $* >/dev/null"; done
@@ -40,8 +51,8 @@ iperf() {	# iperf <extra args>: one run AP->modem; prints "mbps,extra"
 
 : > "$RAW"
 log "matrix start kernel=$KREL reps=$REPS secs=$SECS"
-log "host: $(ssh kali 'sudo -n /usr/local/sbin/mlink-bench-prep status' | tr '\n' ' ')"
-log "temp: $(ssh kali 'echo $(( $(cat /sys/class/thermal/thermal_zone5/temp)/1000 ))C')"
+log "host: $(host 'sudo -n /usr/local/sbin/mlink-bench-prep status' | tr '\n' ' ')"
+log "temp: $(host 'echo $(( $(cat /sys/class/thermal/thermal_zone5/temp)/1000 ))C')"
 up || exit 1
 g modem "pkill iperf3; iperf3 -s -D; pkill udp_pingpong; nohup /mnt/share/udp_pingpong -s >/dev/null 2>&1 &"
 sleep 1
@@ -132,6 +143,6 @@ for rate in 10 50 100 200 0; do
 	done
 done
 
-log "temp: $(ssh kali 'echo $(( $(cat /sys/class/thermal/thermal_zone5/temp)/1000 ))C')"
+log "temp: $(host 'echo $(( $(cat /sys/class/thermal/thermal_zone5/temp)/1000 ))C')"
 for vm in ap modem; do g $vm "bash /mnt/share/dmesg-gate.sh" | tee -a "$RAW"; done
 log "matrix end"
