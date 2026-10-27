@@ -76,3 +76,24 @@ from them.
 > ordering verified with **LKMM litmus tests**.
 
 Every number in it is in `docs/results.md` with its raw file.
+
+## 6. Optimisation after measuring (D17): checksum offload across the link
+
+The E7 profile showed ~6 % of all samples in software checksumming and ~2 % in software
+segmentation on the sender. Over shared memory there is no wire that can flip bits, so the
+L4 checksum is pure overhead — the same reasoning `veth` and `virtio_net` use.
+
+- **Advertise** `NETIF_F_HW_CSUM | NETIF_F_SG` (`mlink_setup`). The stack then hands us skbs
+  with `ip_summed == CHECKSUM_PARTIAL` (checksum *not* filled in; `csum_start`/`csum_offset`
+  say where it would go) and with paged fragments.
+- **TX**: copy with `skb_copy_bits` (gathers fragments) and put `CSUM_PARTIAL`,
+  `csum_start`, `csum_offset` into the descriptor (ABI v2 — the old `rsvd` word).
+- **RX**: the offsets come from untrusted shared memory → check
+  `start + offset + 2 <= len` ourselves, then `skb_partial_csum_set()` marks the skb
+  `CHECKSUM_PARTIAL`. The local stack accepts that as verified; if the packet is *forwarded*
+  to a real NIC, the stack/driver there computes the checksum — correct in both cases.
+  (Marking it `CHECKSUM_UNNECESSARY` instead would be wrong for forwarding: the packet would
+  leave with a garbage checksum.)
+
+Interview angle: "Why is skipping the checksum safe here, and what breaks if you just set
+CHECKSUM_UNNECESSARY?"
