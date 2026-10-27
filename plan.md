@@ -664,6 +664,10 @@ Every phase ends with: walkthrough doc → study gate → commit (+ push once re
   same state-block handshake/heartbeat as `mlink_link.c`; loopback = ICMP echo → reply,
   UDP → swapped addresses and ports; control rings not served. Tests: ping, udp_pingpong,
   iperf3-free (loopback), SSR both ways (kill Zephyr → AP detects; AP rmmod → Zephyr re-handshakes).
+- P8.3 detail (D20): same app, Kconfig `MLINK_MODEM_NET` switches from loopback to a Zephyr
+  `DUMMY_L2` net_if (raw IP, like `mhi_net` on Linux) at 10.77.0.2/24; services: ICMP (stack),
+  UDP echo :7, TCP echo :7, TCP discard :9. AP-side check: ping, udp_pingpong -p 7,
+  `tools/tcp_check.py` (echo integrity + discard throughput), SSR with the stack.
 
 ### Phase 9 — (stretch) aarch64 guest
 - P9.1 `qemu-system-aarch64` (needs package install by user), TCG (slow — functional only).
@@ -795,6 +799,15 @@ For each phase N:
   checksum) and swaps UDP addresses + ports (a CHECKSUM_PARTIAL pseudo-header sum is
   symmetric under the swap, so desc flags/csum fields are reflected as-is); anything else is
   dropped and counted. Control rings (P7) are not served by Zephyr (AP requests time out).
+- **D20 (2026-10-27)** P8.3 design: build-time Kconfig `MLINK_MODEM_NET` (loopback stays the
+  default). Zephyr net driver = `DUMMY_L2` interface (no link header; the net core picks
+  IPv4/IPv6 from the version nibble, as `mhi_net` relies on `ARPHRD_RAWIP`). RX: the poll
+  thread copies a slot once, **completes a CHECKSUM_PARTIAL checksum** (Zephyr's stack verifies
+  L4 checksums; same rule as `skb_checksum_help()`, 0 → 0xffff) and calls `net_recv_data()`.
+  TX: `send()` runs in Zephyr net/app threads, so ring B now has several possible producer
+  threads → a `k_mutex` serialises producers (and the link reset); on a full ring the sender
+  arms `want_space` and sleeps on a semaphore given by the SPACE vector, with the mutex
+  released. Carrier follows the link state (`net_if_carrier_on/off`). IPv6 off.
 - **D14 (2026-10-27)** Guest kernel = **v6.18.59** (latest 6.18 longterm per kernel.org
   releases.json on 2026-10-27; 7.2.13 stable / 7.3 mainline not chosen — LTS for stable APIs).
   QEMU source 10.2.2, GPG signature verified (key CEACC9E15534EBABB82D3FA03353C9CEF108B584),

@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: GPL-2.0-only
+mainmenu "mlink Zephyr modem"
+
+config MLINK_MODEM_NET
+	bool "Hand packets to the Zephyr IP stack instead of reflecting them"
+	depends on NETWORKING && NET_L2_DUMMY
+	help
+	  P8.3: register the mlink ring pair as a raw-IP (DUMMY_L2) network
+	  interface at 10.77.0.2/24 and run UDP echo :7, TCP echo :7 and TCP
+	  discard :9 on it. Without it the modem runs in loopback test mode.
+
+source "Kconfig.zephyr"

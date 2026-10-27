@@ -1,34 +1,30 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * mlink "loopback modem" on Zephyr (P8.2, plan.md D19).
+ * mlink modem on Zephyr (P8.2/P8.3, plan.md D19/D20).
  *
  * Takes the modem role of the shared-memory ABI in driver/mlink_shm.h, using
  * the Linux driver's ring code (driver/mlink_ring.c) unchanged. The link state
- * machine mirrors driver/mlink_link.c; the data path reflects every IPv4
- * ICMP echo request as a reply and every UDP datagram back to its sender,
- * which is what a modem's loopback test mode does.
+ * machine mirrors driver/mlink_link.c. The data path either reflects every
+ * IPv4 ICMP echo request as a reply and every UDP datagram back to its sender
+ * (loopback test mode, default), or with CONFIG_MLINK_MODEM_NET hands packets
+ * to the Zephyr IP stack (net.c).
  *
- * One thread does everything: it sleeps on the five doorbell vectors with a
- * HB_MS timeout, so a kick wakes it at once and the timeout drives the
+ * One thread runs the link and RX: it sleeps on the five doorbell vectors
+ * with a HB_MS timeout, so a kick wakes it at once and the timeout drives the
  * heartbeat and handshake.
  */
 #include <string.h>
 
 #include <zephyr/drivers/virtualization/ivshmem.h>
-#include <zephyr/kernel.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/printk.h>
 
-#include <asm/barrier.h>	/* compat/: virt_* as in Linux */
-#include <linux/compiler.h>	/* compat/: READ_ONCE, WRITE_ONCE */
-
-#include "mlink_ring.h"
+#include "modem.h"
 
 #define HB_MS		50
 #define HB_TIMEOUT_MS	500	/* same as the driver's hb_timeout_ms default */
 #define RX_BUDGET	64
 #define STATS_MS	5000
-#define OWN_MTU		1500	/* informational: the AP does not read it */
 
 enum reset_reason { R_HB_TIMEOUT, R_PEER_GEN, R_PEER_DOWN, R_RING };
 
@@ -39,38 +35,13 @@ static const char *const reset_names[] = {
 	[R_RING]       = "ring error",
 };
 
-struct modem_stats {
-	u32 irqs[MLINK_NR_VECTORS];
-	u32 rx, tx, icmp, udp, frags, dropped, bad_len, tx_full;
-	u32 kicks_data, kicks_space, kicks_state;
-	u32 link_ups, link_resets;
-};
-
-static struct modem {
-	const struct device *dev;
-	u8 *shm;
-	struct mlink_shm_hdr *hdr;
-	struct mlink_shm_state *self, *peer;	/* MODEM block, AP block */
-	struct mlink_ring tx, rx;		/* ring B (to AP), ring A (from AP) */
-	struct mlink_ring ctrl_tx, ctrl_rx;	/* rings D, C: only reset, not served */
-
-	u32 own_id, peer_id;
-	bool hdr_ok, peer_found, link_up;
-	enum mlink_link_state state;
-	u32 gen, peer_gen, tx_seq;
-	bool rx_broken, tx_broken;
-
-	u32 hb_seen, peer_activity;
-	int64_t hb_changed;
-
-	struct modem_stats st;
-} m;
+struct modem m;
 
 static struct k_poll_signal sigs[MLINK_NR_VECTORS];
 static struct k_poll_event events[MLINK_NR_VECTORS];
 static u8 pkt[MLINK_SLOT_SIZE];	/* private copy: never parse shared memory in place */
 
-static void kick(enum mlink_vector vec)
+void modem_kick(enum mlink_vector vec)
 {
 	if (vec == MLINK_VEC_DATA)
 		m.st.kicks_data++;
@@ -140,14 +111,17 @@ static void link_new_gen(void)
 	WRITE_ONCE(s->gen, READ_ONCE(s->gen) + 1);
 	m.gen = READ_ONCE(s->gen);
 	virt_wmb();	/* new gen visible before the zeroed indices */
+	/* No producer may be mid-publish while its index is zeroed. */
+	k_mutex_lock(&m.tx_lock, K_FOREVER);
 	mlink_ring_reset_producer(&m.tx);
+	m.tx_seq = 0;
+	m.tx_broken = false;
+	k_mutex_unlock(&m.tx_lock);
 	mlink_ring_reset_consumer(&m.rx);
 	/* Stale control indices from an earlier Linux modem would look like corruption. */
 	mlink_ring_reset_producer(&m.ctrl_tx);
 	mlink_ring_reset_consumer(&m.ctrl_rx);
-	m.tx_seq = 0;
 	m.rx_broken = false;
-	m.tx_broken = false;
 }
 
 static void link_start(void)
@@ -163,19 +137,23 @@ static void link_reset(enum reset_reason why)
 	printk("mlink-modem: link reset: %s (was %s)\n", reset_names[why],
 	       m.state == MLINK_ST_UP ? "UP" : "WAIT_PEER");
 	m.st.link_resets++;
-	m.link_up = false;	/* the data path runs in this thread: already quiet */
+	/* Senders check link_up under tx_lock; RX runs in this thread. */
+	WRITE_ONCE(m.link_up, false);
+	modem_net_carrier(false);
+	k_sem_give(&m.space_sem);	/* a sender waiting for space rechecks link_up */
 	link_new_gen();
 	state_publish(MLINK_ST_WAIT_PEER);
 	if (m.peer_found)
-		kick(MLINK_VEC_STATE);
+		modem_kick(MLINK_VEC_STATE);
 }
 
 static void link_bring_up(void)
 {
 	m.st.link_ups++;
 	state_publish(MLINK_ST_UP);
-	m.link_up = true;
-	kick(MLINK_VEC_STATE);
+	WRITE_ONCE(m.link_up, true);
+	modem_net_carrier(true);
+	modem_kick(MLINK_VEC_STATE);
 	printk("mlink-modem: link UP: peer id=%u gen=%u, own gen=%u\n",
 	       m.peer_id, m.peer_gen, m.gen);
 }
@@ -249,7 +227,7 @@ static void link_tick(void)
 			m.peer_gen = pgen;
 			virt_wmb();	/* our gen/reset are already published; the ack comes after */
 			WRITE_ONCE(m.self->peer_gen_seen, pgen);
-			kick(MLINK_VEC_STATE);
+			modem_kick(MLINK_VEC_STATE);
 		}
 		/* ...and go UP once it has acknowledged ours. */
 		if (pseen == m.gen && m.peer_gen == pgen)
@@ -360,6 +338,20 @@ static bool data_poll(void)
 			goto consume;
 		}
 
+		if (IS_ENABLED(CONFIG_MLINK_MODEM_NET)) {
+			m.st.rx++;
+			memcpy(pkt, d.data, d.len);	/* single fetch of the payload */
+			if (modem_net_rx(pkt, d.len, &d))
+				m.st.to_stack++;
+			else
+				m.st.dropped++;
+			goto consume;
+		}
+
+		/*
+		 * Loopback: this thread is ring B's only producer, and the reset
+		 * runs in this thread too, so no tx_lock is needed here.
+		 */
 		n = mlink_ring_free(&m.tx);
 		if (n < 0) {
 			m.tx_broken = true;
@@ -400,10 +392,10 @@ consume:
 	if (consumed) {
 		mlink_ring_release(&m.rx);
 		if (mlink_ring_need_space_kick(&m.rx, true))
-			kick(MLINK_VEC_SPACE);
+			modem_kick(MLINK_VEC_SPACE);
 	}
 	if (published && mlink_ring_need_kick(&m.tx, true))
-		kick(MLINK_VEC_DATA);
+		modem_kick(MLINK_VEC_DATA);
 	return budget == 0;
 }
 
@@ -413,10 +405,12 @@ static void print_stats(void)
 {
 	struct modem_stats *s = &m.st;
 
-	printk("mlink-modem: %s gen=%u rx=%u tx=%u icmp=%u udp=%u frag=%u drop=%u badlen=%u "
-	       "full=%u irq=%u/%u/%u/%u/%u kicks d/s/st=%u/%u/%u ups=%u resets=%u\n",
+	printk("mlink-modem: %s gen=%u rx=%u tx=%u icmp=%u udp=%u frag=%u stack=%u csum=%u "
+	       "drop=%u badlen=%u full=%u txwait=%u txdrop=%u irq=%u/%u/%u/%u/%u "
+	       "kicks d/s/st=%u/%u/%u ups=%u resets=%u\n",
 	       m.state == MLINK_ST_UP ? "UP" : "WAIT", m.gen, s->rx, s->tx, s->icmp, s->udp,
-	       s->frags, s->dropped, s->bad_len, s->tx_full, s->irqs[0], s->irqs[1], s->irqs[2],
+	       s->frags, s->to_stack, s->csum_fixed, s->dropped, s->bad_len, s->tx_full,
+	       s->tx_waits, s->tx_dropped, s->irqs[0], s->irqs[1], s->irqs[2],
 	       s->irqs[3], s->irqs[4], s->kicks_data, s->kicks_space, s->kicks_state,
 	       s->link_ups, s->link_resets);
 }
@@ -429,6 +423,8 @@ int main(void)
 	struct modem_stats last = {0};
 	bool busy = false;
 
+	k_mutex_init(&m.tx_lock);
+	k_sem_init(&m.space_sem, 0, 1);
 	m.dev = DEVICE_DT_GET(DT_NODELABEL(ivshmem0));
 	if (!device_is_ready(m.dev)) {
 		printk("mlink-modem: no ivshmem device\n");
@@ -473,6 +469,9 @@ int main(void)
 				m.st.irqs[i]++;
 				k_poll_signal_reset(&sigs[i]);
 				events[i].state = K_POLL_STATE_NOT_READY;
+				/* A sender blocked on a full ring B (IP-stack mode) may go on. */
+				if (i == MLINK_VEC_SPACE)
+					k_sem_give(&m.space_sem);
 			}
 		}
 
