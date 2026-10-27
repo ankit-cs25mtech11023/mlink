@@ -134,6 +134,22 @@ SSR 3 rounds (recovery 39–51 ms). A TCP connection open across a modem crash g
 with the modem left dead the same client instead times out after 30 s. Not exercised: ring B
 full (Zephyr never out-produced the AP).
 
+## 6b. The control plane on Zephyr (`src/ctrl.c`)
+
+`tools/mlinkd` serves P7 requests on the Linux modem through `/dev/mlink_ctrl`. Zephyr has no
+such device, so `ctrl.c` speaks rings C/D directly with the kernel's framing
+(`driver/mlink_ctrl.c`): one message per slot, `proto = MLINK_PROTO_CTRL`, desc `seq =
+txn_id`, and **no kick suppression** on these rings (low rate, every publish or consume rings
+CTRL). It reuses `tools/mlink_ctrl_lib.h` (`msg_init`, `tlv_put`, bounds-checked `tlv_get`)
+and the compat shim gained the `__u*` types `mlink_ctrl.h` uses. Same rules as everywhere:
+copy the slot first, then validate only the copy (`sizeof(hdr) + h->len == d.len`, type REQ).
+
+SET_DATA_CALL down makes the modem drop data traffic (and turns the Zephyr carrier off in
+IP-stack mode), then answers and sends the IND. With the unchanged `mlinkctl` on the AP
+(`bench/results/p8-zephyr-ctrl.txt`): info, stats (3 pings → 3 packets / 252 bytes each way),
+call down → ping 100 % loss, call up → OK, 500 GET_LINK_INFO round trips p50 438 µs (TCG),
+504/504 requests answered, 0 invalid.
+
 ## 7. Questions to be ready for
 
 1. Why must `virt_mb()` be a real fence on a uniprocessor Zephyr build?

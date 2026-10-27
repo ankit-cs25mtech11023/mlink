@@ -63,7 +63,9 @@ numbers measured on a perf kernel. Full methodology and caveats: [`docs/results.
   shim; loopback test mode (ICMP echo → reply with RFC 1624 checksum update, UDP reflected);
   restarts detected by the AP via generation change (recovery 44–53 ms) or heartbeat (521 ms).
   Or, built with `net.conf`, the ring pair becomes a raw-IP Zephyr network interface with the
-  real Zephyr TCP/IP stack (TCP echo verified byte-exact, UDP echo, ping).
+  real Zephyr TCP/IP stack (TCP echo verified byte-exact, UDP echo, ping). It also answers the
+  control plane like `mlinkd` (link info, stats, data call up/down + indication), so the
+  unchanged `mlinkctl` works against it.
 - **arm64**: the same driver cross-built for arm64 runs as the modem of the x86 AP on one shared
   region (ring selftest 1 M msgs each way, 0 errors; `virt_*` → `stlr`/`ldar`/`dmb ish`).
 - **Hardening**: host-side **shared-memory corruption injector** (`tools/shm_chaos.c`),
@@ -92,9 +94,11 @@ ssh mlink-ap 'ping 10.77.0.2'
   verification and measured numbers — not novelty of the transport.
 
 ## Limitations
-Not a production driver: fixed layout, copy-based (two copies per packet), x86-only memory
-ordering tested at runtime (LKMM covers the model), single queue, peers are VMs on one host (the Zephyr modem runs under TCG and does not
-serve the control plane). Numbers are VM-to-VM on a 2017 laptop CPU.
+Not a production driver: fixed layout, copy-based (two copies per packet), single queue,
+peers are VMs on one host. The arm64 and Zephyr peers run under TCG on an x86 host, so ARM's
+weaker reorderings never actually occur at runtime; ordering correctness rests on the LKMM
+litmus tests and the checked `stlr`/`ldar`/`dmb` mapping. Numbers are VM-to-VM on a 2017
+laptop CPU.
 
 ## License
 GPL-2.0-only. See [LICENSE](LICENSE).
