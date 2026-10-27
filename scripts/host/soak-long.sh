@@ -8,6 +8,7 @@
 #
 # Usage: bash ~/D/mlink/scripts/host/soak-long.sh [DUR] > ~/D/mlink-work/logs/soak-long.log
 set -uo pipefail
+mkdir -p "$HOME/D/mlink-work/tmp"	# scratch files stay inside the project (hard rule 2)
 
 DUR=${1:-3600}
 ABORT_C=${ABORT_C:-92}
@@ -28,7 +29,7 @@ sleep 3
 echo "=== long soak start $(date -Is) dur=${DUR}s temp=$(temp)C"
 
 end=$((SECONDS + DUR))
-G ap "ping -i 0.05 -w $DUR -q 10.77.0.2" > /tmp/sl-ping.$$ 2>&1 &
+G ap "ping -i 0.05 -w $DUR -q 10.77.0.2" > $HOME/D/mlink-work/tmp/sl-ping.$$ 2>&1 &
 PING=$!
 (	# TCP sessions; a session broken by a restart just ends and the next starts
 	n=0
@@ -40,7 +41,7 @@ PING=$!
 		n=$((n + 1)); echo "tcp session $n: ${r:-ended early} Mbit/s (rx/tx)"
 		sleep 1
 	done
-) > /tmp/sl-tcp.$$ 2>&1 &
+) > $HOME/D/mlink-work/tmp/sl-tcp.$$ 2>&1 &
 TCP=$!
 
 chaos=0; restarts=0; maxt=0; aborted=0; next_chaos=$((SECONDS + 120)); next_ssr=$((SECONDS + 270))
@@ -62,14 +63,14 @@ done
 [ $aborted = 1 ] && G ap "pkill iperf3; pkill ping"
 wait $PING $TCP 2>/dev/null
 
-echo "=== tcp"; cat /tmp/sl-tcp.$$
-echo "=== ping"; tail -2 /tmp/sl-ping.$$
-rm -f /tmp/sl-ping.$$ /tmp/sl-tcp.$$
+echo "=== tcp"; cat $HOME/D/mlink-work/tmp/sl-tcp.$$
+echo "=== ping"; tail -2 $HOME/D/mlink-work/tmp/sl-ping.$$
+rm -f $HOME/D/mlink-work/tmp/sl-ping.$$ $HOME/D/mlink-work/tmp/sl-tcp.$$
 for vm in ap modem; do
 	echo "=== $vm"
 	G $vm "grep -E 'state|link_ups|link_resets' /sys/kernel/debug/mlink/link | tr -s ' '"
 	G $vm "ethtool -S mlink0 | grep -E 'corruptions|stalls|errors|repairs|hb_saved' | tr -s ' ' | paste -sd' '"
 	G $vm "echo scan > /sys/kernel/debug/kmemleak; sleep 5; echo scan > /sys/kernel/debug/kmemleak; echo kmemleak reports: \$(grep -c unreferenced /sys/kernel/debug/kmemleak)"
-	G $vm "bash /mnt/share/dmesg-gate.sh $MARK"
+	G $vm "KCSAN_FILTER=${KCSAN_FILTER:-0} bash /mnt/share/dmesg-gate.sh $MARK"
 done
 echo "=== long soak end $(date -Is) chaos_bursts=$chaos modem_restarts=$restarts max_temp=${maxt}C aborted=$aborted"

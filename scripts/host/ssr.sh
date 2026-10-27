@@ -13,6 +13,7 @@
 #   d  both drivers restart
 #   e  N consecutive (a) cycles without traffic checks between them
 set -uo pipefail
+mkdir -p "$HOME/D/mlink-work/tmp"	# scratch files stay inside the project (hard rule 2)
 
 H=~/D/mlink/scripts/host
 G() {	# G ap|modem cmd...
@@ -37,25 +38,25 @@ link_up() {	# wait until both sides report state UP
 traffic_start() {
 	G modem "pkill iperf3; iperf3 -s -D" >/dev/null 2>&1
 	sleep 0.5
-	G ap "ping -D -i 0.01 -w $1 10.77.0.2" > /tmp/ssr-ping.$$ 2>&1 &
+	G ap "ping -D -i 0.01 -w $1 10.77.0.2" > $HOME/D/mlink-work/tmp/ssr-ping.$$ 2>&1 &
 	PING=$!
-	G ap "iperf3 -c 10.77.0.2 -t $1 -f m" > /tmp/ssr-iperf.$$ 2>&1 &
+	G ap "iperf3 -c 10.77.0.2 -t $1 -f m" > $HOME/D/mlink-work/tmp/ssr-iperf.$$ 2>&1 &
 	IPERF=$!
 }
 
 traffic_report() {
 	wait $PING $IPERF 2>/dev/null
-	echo "ping: $(grep -E 'packets transmitted' /tmp/ssr-ping.$$)"
-	echo "ping gap (longest without reply): $(grep -o '^\[[0-9.]*\]' /tmp/ssr-ping.$$ |
+	echo "ping: $(grep -E 'packets transmitted' $HOME/D/mlink-work/tmp/ssr-ping.$$)"
+	echo "ping gap (longest without reply): $(grep -o '^\[[0-9.]*\]' $HOME/D/mlink-work/tmp/ssr-ping.$$ |
 		tr -d '[]' | awk 'NR>1 { g = $1 - p; if (g > m) m = g } { p = $1 } END { printf "%.0f ms", m * 1000 }')"
 	# Survived = the client finished without error and the receiver got data.
-	if grep -q receiver /tmp/ssr-iperf.$$ && ! grep -qi error /tmp/ssr-iperf.$$ &&
-	   ! grep receiver /tmp/ssr-iperf.$$ | grep -q ' 0.00 Bytes'; then
-		echo "TCP: survived — $(grep receiver /tmp/ssr-iperf.$$ | awk '{print $5, $6, $7, $8}')"
+	if grep -q receiver $HOME/D/mlink-work/tmp/ssr-iperf.$$ && ! grep -qi error $HOME/D/mlink-work/tmp/ssr-iperf.$$ &&
+	   ! grep receiver $HOME/D/mlink-work/tmp/ssr-iperf.$$ | grep -q ' 0.00 Bytes'; then
+		echo "TCP: survived — $(grep receiver $HOME/D/mlink-work/tmp/ssr-iperf.$$ | awk '{print $5, $6, $7, $8}')"
 	else
-		echo "TCP: did NOT survive — $(grep -iE 'error|unable' /tmp/ssr-iperf.$$ | head -1)"
+		echo "TCP: did NOT survive — $(grep -iE 'error|unable' $HOME/D/mlink-work/tmp/ssr-iperf.$$ | head -1)"
 	fi
-	rm -f /tmp/ssr-ping.$$ /tmp/ssr-iperf.$$
+	rm -f $HOME/D/mlink-work/tmp/ssr-ping.$$ $HOME/D/mlink-work/tmp/ssr-iperf.$$
 }
 
 ap_link() { G ap "grep -E 'link_resets|last_recover|last_hb_age' /sys/kernel/debug/mlink/link"; }

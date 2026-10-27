@@ -8,6 +8,7 @@
 #
 # Usage: bash ~/D/mlink/scripts/host/soak.sh [DUR] > ~/D/mlink-work/logs/soak.log
 set -uo pipefail
+mkdir -p "$HOME/D/mlink-work/tmp"	# scratch files stay inside the project (hard rule 2)
 
 DUR=${1:-600}
 ABORT_C=${ABORT_C:-92}
@@ -28,11 +29,11 @@ sleep 2
 G modem "pkill iperf3; iperf3 -s -D"
 sleep 1
 
-G ap "iperf3 -c 10.77.0.2 --bidir -P 8 -t $DUR -f m" > /tmp/mlink-soak-iperf.$$ 2>&1 &
+G ap "iperf3 -c 10.77.0.2 --bidir -P 8 -t $DUR -f m" > $HOME/D/mlink-work/tmp/mlink-soak-iperf.$$ 2>&1 &
 IPERF=$!
-G ap "ping -f -w $DUR -q 10.77.0.2" > /tmp/mlink-soak-ping.$$ 2>&1 &
+G ap "ping -f -w $DUR -q 10.77.0.2" > $HOME/D/mlink-work/tmp/mlink-soak-ping.$$ 2>&1 &
 PING=$!
-G modem "end=\$((SECONDS + $DUR)); n=0; while [ \$SECONDS -lt \$end ]; do sleep 5; ip link set mlink0 down; sleep 0.5; ip link set mlink0 up; n=\$((n+1)); done; echo flaps=\$n" > /tmp/mlink-soak-flap.$$ 2>&1 &
+G modem "end=\$((SECONDS + $DUR)); n=0; while [ \$SECONDS -lt \$end ]; do sleep 5; ip link set mlink0 down; sleep 0.5; ip link set mlink0 up; n=\$((n+1)); done; echo flaps=\$n" > $HOME/D/mlink-work/tmp/mlink-soak-flap.$$ 2>&1 &
 FLAP=$!
 
 aborted=0
@@ -50,10 +51,10 @@ while kill -0 $IPERF 2>/dev/null; do
 done
 wait $IPERF $PING $FLAP 2>/dev/null
 
-echo "=== iperf3 (last lines)"; grep -E "SUM.*(sender|receiver)" /tmp/mlink-soak-iperf.$$ | tail -4; grep -cE "^\[SUM\]" /tmp/mlink-soak-iperf.$$ | sed "s/^/interval lines: /"
-echo "=== ping flood"; tail -3 /tmp/mlink-soak-ping.$$
-echo "=== flaps"; cat /tmp/mlink-soak-flap.$$
-rm -f /tmp/mlink-soak-*.$$
+echo "=== iperf3 (last lines)"; grep -E "SUM.*(sender|receiver)" $HOME/D/mlink-work/tmp/mlink-soak-iperf.$$ | tail -4; grep -cE "^\[SUM\]" $HOME/D/mlink-work/tmp/mlink-soak-iperf.$$ | sed "s/^/interval lines: /"
+echo "=== ping flood"; tail -3 $HOME/D/mlink-work/tmp/mlink-soak-ping.$$
+echo "=== flaps"; cat $HOME/D/mlink-work/tmp/mlink-soak-flap.$$
+rm -f $HOME/D/mlink-work/tmp/mlink-soak-*.$$
 for vm in ap modem; do
 	echo "=== $vm counters"
 	G $vm "ip -s link show mlink0 | sed -n '3,6p'; ethtool -S mlink0 | tail -n +2 | tr -s ' ' | tr '\n' ' '; echo"

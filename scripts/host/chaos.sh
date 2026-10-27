@@ -8,6 +8,7 @@
 #
 # Usage: bash ~/D/mlink/scripts/host/chaos.sh [DUR] [RATE] [SEED]
 set -uo pipefail
+mkdir -p "$HOME/D/mlink-work/tmp"	# scratch files stay inside the project (hard rule 2)
 
 DUR=${1:-10}
 RATE=${2:-20}
@@ -44,12 +45,12 @@ sleep 1
 echo "=== chaos campaign $(date -Is) dur=${DUR}s rate=${RATE}/s seed=$SEED"
 for mode in ${MODES:-flip len idx flags magic hb mix}; do
 	echo "--- mode $mode"
-	G ap "iperf3 -c 10.77.0.2 -t $((DUR + 5)) -f m" > /tmp/chaos-iperf.$$ 2>&1 &
+	G ap "iperf3 -c 10.77.0.2 -t $((DUR + 5)) -f m" > $HOME/D/mlink-work/tmp/chaos-iperf.$$ 2>&1 &
 	IP=$!
 	sleep 2
-	$CHAOS -m $mode -r "$RATE" -d "$DUR" -s "$SEED" > /tmp/chaos-ops.$$ 2>&1
+	$CHAOS -m $mode -r "$RATE" -d "$DUR" -s "$SEED" > $HOME/D/mlink-work/tmp/chaos-ops.$$ 2>&1
 	t1=$(date +%s.%N)
-	echo "chaos ops: $(grep -c -vE '^shm_chaos' /tmp/chaos-ops.$$) ($(head -1 /tmp/chaos-ops.$$ | cut -c1-60))"
+	echo "chaos ops: $(grep -c -vE '^shm_chaos' $HOME/D/mlink-work/tmp/chaos-ops.$$) ($(head -1 $HOME/D/mlink-work/tmp/chaos-ops.$$ | cut -c1-60))"
 	if both_up; then
 		echo "recovered: both sides UP $(echo "$(date +%s.%N) - $t1" | bc | cut -c1-5) s after chaos stopped (incl. ssh polling)"
 	else
@@ -67,7 +68,7 @@ for mode in ${MODES:-flip len idx flags magic hb mix}; do
 	echo "modem: $(counters modem)"
 	SEED=$((SEED + 1))
 done
-rm -f /tmp/chaos-iperf.$$ /tmp/chaos-ops.$$
+rm -f $HOME/D/mlink-work/tmp/chaos-iperf.$$ $HOME/D/mlink-work/tmp/chaos-ops.$$
 echo "--- dmesg gate"
 for vm in ap modem; do G $vm "bash /mnt/share/dmesg-gate.sh $MARK"; done
 echo "=== end $(date -Is) temp=$(( $(cat /sys/class/thermal/thermal_zone5/temp) / 1000 ))C"
