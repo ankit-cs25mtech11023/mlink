@@ -177,7 +177,15 @@ Format: symptom → hypotheses → evidence → root cause → fix → lesson. N
   netif_tx_wake_queue`, `netif_tx_wake_queue / qdisc_maybe_clear_missed` (reached from our
   SPACE hardirq, a supported context for waking a queue), timekeeping, nohz, pfifo_fast. The
   `KCSAN_FILTER=1` gate fails only on reports whose race header names an mlink function and
-  counts the rest. Re-run: `p5-soak-long-kcsan-2.txt`.
+  counts the rest.
+- **Re-run #2** (`p5-soak-long-kcsan-2.txt`): the index races are gone (modem 0, was 3), but
+  the AP showed a new one: `mlink_get_stats64 / mlink_net_rx`, an RX packet counter (value
+  +1). The driver used `u64` counters inside `u64_stats_update_begin/end`; on 64-bit the
+  seqcount is empty, so those are plain accesses racing with the lockless `ndo_get_stats64`
+  reader (here from linkwatch). Fix: `u64_stats_t` + `u64_stats_inc/add/read` (marked on
+  64-bit, still seqcount-protected on 32-bit). The diagnostic `mdev->stats` counters, same
+  class but pure diagnostics, get `data_race()` on their single reader. Re-run #3:
+  `p5-soak-long-kcsan-3.txt`.
 - **Lesson:** "lockless by design" still needs the accesses *marked*; KCSAN found what the
   LKMM litmus tests could not, because the litmus tests model the cross-VM protocol, not the
   intra-kernel watchdog reads.

@@ -1,0 +1,63 @@
+# P5.4 KCSAN 1-h soak #2 (after the r->idx fix, before the stats fix) — 6.18.59-mlink-kcsan, turbo off
+# command (laptop, tmux): KCSAN_FILTER=1 bash ~/D/mlink/scripts/host/thermal-run.sh bash ~/D/mlink/scripts/host/soak-long.sh 3600
+# RESULT: r->idx races gone (modem 0 mlink-code races, was 3); AP: 1 new race mlink_get_stats64 / mlink_net_rx (u64 stats on 64-bit) -> fixed with u64_stats_t
+2026-10-27T18:56:40+05:30 start pgid=2227727 hot=88 cool=78 temp=44C: bash /home/ankit-kali/D/mlink/scripts/host/soak-long.sh 3600
+=== long soak start 2026-10-27T18:56:44+05:30 dur=3600s temp=44C
+18:58:55 chaos burst 1 done
+19:01:18 modem restart 1 done
+19:04:08 chaos burst 2 done
+19:06:21 modem restart 2 done
+19:09:21 chaos burst 3 done
+19:11:23 modem restart 3 done
+19:14:34 chaos burst 4 done
+19:16:27 modem restart 4 done
+19:19:47 chaos burst 5 done
+19:21:29 modem restart 5 done
+19:24:59 chaos burst 6 done
+19:26:32 modem restart 6 done
+19:30:13 chaos burst 7 done
+19:31:36 modem restart 7 done
+19:35:26 chaos burst 8 done
+19:36:39 modem restart 8 done
+19:40:39 chaos burst 9 done
+19:41:42 modem restart 9 done
+19:45:52 chaos burst 10 done
+19:46:45 modem restart 10 done
+19:51:05 chaos burst 11 done
+19:51:48 modem restart 11 done
+19:56:18 chaos burst 12 done
+=== tcp
+=== ping
+61876 packets transmitted, 61394 received, 0.778977% packet loss, time 3599984ms
+rtt min/avg/max/mdev = 0.194/26.405/688.507/24.498 ms, pipe 11
+=== ap
+state: UP
+link_ups: 590
+link_resets: 589 (hb_timeout 0, peer_gen 274, peer_down 141, ring 174)
+ rx_len_errors: 93  rx_proto_errors: 6  rx_stalls: 14  ring_corruptions: 174  hb_saved_by_ring: 2333  hdr_repairs: 142  tx_stalls: 22  rx_csum_errors: 1
+bash: line 1: /sys/kernel/debug/kmemleak: Permission denied
+bash: line 1: /sys/kernel/debug/kmemleak: Permission denied
+grep: /sys/kernel/debug/kmemleak: No such file or directory
+kmemleak reports:
+KCSAN-FILTER: 70 report(s): 1 in mlink code, 60 in core code reached via mlink, 9 other
+DMESG GATE: FAIL (mlink-ap)
+[ 7865.870865] BUG: KCSAN: data-race in mlink_get_stats64 [mlink] / mlink_net_rx [mlink]
+=== modem
+state: UP
+link_ups: 58
+link_resets: 57 (hb_timeout 0, peer_gen 32, peer_down 8, ring 17)
+ rx_len_errors: 6  rx_proto_errors: 0  rx_stalls: 0  ring_corruptions: 17  hb_saved_by_ring: 222  hdr_repairs: 0  tx_stalls: 2  rx_csum_errors: 0
+bash: line 1: /sys/kernel/debug/kmemleak: Permission denied
+bash: line 1: /sys/kernel/debug/kmemleak: Permission denied
+grep: /sys/kernel/debug/kmemleak: No such file or directory
+kmemleak reports:
+KCSAN-FILTER: 77 report(s): 0 in mlink code, 60 in core code reached via mlink, 17 other
+DMESG GATE: PASS (mlink-modem)
+=== long soak end 2026-10-27T19:57:05+05:30 chaos_bursts=12 modem_restarts=11 max_temp=64C aborted=0
+2026-10-27T19:57:06+05:30 end rc=0, frozen for 0s total, temp=54C
+EXIT=0
+## the mlink-code report on ap
+BUG: KCSAN: data-race in mlink_get_stats64 [mlink] / mlink_net_rx [mlink]
+write (8 bytes) by interrupt: mlink_net_rx <- mlink_rx_poll <- mlink_napi_poll <- net_rx_action (ksoftirqd)
+read  (8 bytes) by task:      mlink_get_stats64 <- dev_get_stats <- rtnl_fill_stats <- linkwatch_event
+value changed: 0x00000000093c65f6 -> 0x00000000093c65f7

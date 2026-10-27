@@ -15,10 +15,12 @@ steps, open problems), then `plan.md` and `checkbox.md`, then continue from HAND
 Keep `HANDOFF.md` updated after every milestone/commit so a fresh session can resume.
 
 ## Current Phase
-MVP implementation complete through Phase 6 (2026-10-27): driver, rings, netdev, SSR,
-hardening, perf-kernel measurements, results.md, README. Open: user study gates 0-6, P1.1
-design review, P6.7 resume-bullet approval, P6.10 mock grill, debug-kernel soft lockup (P5.5,
-perf kernel clean), optional P5.4 KCSAN. Stretch phases P7+ not started.
+All implementation done (2026-10-27): MVP P0-P6, P7 control plane, P8 Zephyr modem (loopback,
+full IP stack, control plane), P9 arm64 modem vs x86 AP, P5.4/P5.5 soaks. P10 QEMU patch
+prepared and tested in `upstream/` — waits for the user's full name, SMTP app password and
+go-ahead to send. P11 descoped (no hardware, D22). Open for the user only: study gates 0-9,
+P1.1 design review, P6.7 resume bullet, P6.10 grill. Known issue: one unreproduced
+debug-kernel soft lockup (debugging-log).
 
 ## Recent Decisions
 - Builds/VMs run on the old Kali laptop over SSH; Claude Code runs on the Windows PC. Windows
@@ -28,6 +30,12 @@ perf kernel clean), optional P5.4 KCSAN. Stretch phases P7+ not started.
   D16 NAPI sweep 8..64, turbo-off benchmarks. Long jobs: turbo off + `thermal-run.sh` (98 °C
   critical trip on this laptop).
 - Deadline unknown: presentable minimum after P3, MVP/resume freeze after P6; P7+ are stretch.
+- D21: never install toolchains via apt if it upgrades system packages; arm64 QEMU built from
+  verified source, kernel.org cross GCC (user approved), all in `~/D/mlink-work/opt`.
+- D22: P11 descoped; finish everything except the user's reading; P10 from
+  cs25mtech11023@iith.ac.in (Google Workspace SMTP), sent only after the user confirms.
+- Laptop shell is zsh: `$VAR` holding a command is not word-split, and `pkill -f`/`pgrep -f`
+  match their own `zsh -c` line — put logic in bash scripts, anchor patterns.
 
 ## Environment cheat-sheet
 - Laptop: `ankit-kali@100.83.145.82` (Tailscale). Alias `kali` once P0.3 is done; until then use

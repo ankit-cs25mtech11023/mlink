@@ -1,0 +1,73 @@
+# P5.4 KCSAN 1-h soak #3 (both fixes: ring r->idx marking + u64_stats_t) — 6.18.59-mlink-kcsan, turbo off
+# command (laptop, tmux): KCSAN_FILTER=1 bash ~/D/mlink/scripts/host/thermal-run.sh bash ~/D/mlink/scripts/host/soak-long.sh 3600
+# RESULT: PASS — 0 KCSAN reports in mlink code on either side; remaining reports are core-kernel races
+2026-10-27T20:01:13+05:30 start pgid=2347716 hot=88 cool=78 temp=45C: bash /home/ankit-kali/D/mlink/scripts/host/soak-long.sh 3600
+=== long soak start 2026-10-27T20:01:18+05:30 dur=3600s temp=42C
+20:03:28 chaos burst 1 done
+20:05:51 modem restart 1 done
+20:08:41 chaos burst 2 done
+20:10:53 modem restart 2 done
+20:13:53 chaos burst 3 done
+20:15:56 modem restart 3 done
+20:19:06 chaos burst 4 done
+20:20:59 modem restart 4 done
+20:24:19 chaos burst 5 done
+20:26:02 modem restart 5 done
+20:29:32 chaos burst 6 done
+20:31:06 modem restart 6 done
+20:34:46 chaos burst 7 done
+20:36:09 modem restart 7 done
+20:40:00 chaos burst 8 done
+20:41:12 modem restart 8 done
+20:45:13 chaos burst 9 done
+20:46:15 modem restart 9 done
+20:50:26 chaos burst 10 done
+20:51:18 modem restart 10 done
+20:55:38 chaos burst 11 done
+20:56:22 modem restart 11 done
+21:00:52 chaos burst 12 done
+=== tcp
+=== ping
+61962 packets transmitted, 61485 received, 0.769827% packet loss, time 3599973ms
+rtt min/avg/max/mdev = 0.202/25.833/476.490/22.786 ms, pipe 10
+=== ap
+state: UP
+link_ups: 580
+link_resets: 579 (hb_timeout 0, peer_gen 274, peer_down 143, ring 162)
+ rx_len_errors: 96  rx_proto_errors: 6  rx_stalls: 11  ring_corruptions: 162  hb_saved_by_ring: 2150  hdr_repairs: 141  tx_stalls: 24  rx_csum_errors: 2
+bash: line 1: /sys/kernel/debug/kmemleak: Permission denied
+bash: line 1: /sys/kernel/debug/kmemleak: Permission denied
+grep: /sys/kernel/debug/kmemleak: No such file or directory
+kmemleak reports:
+KCSAN-FILTER: 70 report(s): 0 in mlink code, 59 in core code reached via mlink, 11 other
+DMESG GATE: PASS (mlink-ap)
+=== modem
+state: UP
+link_ups: 35
+link_resets: 34 (hb_timeout 0, peer_gen 21, peer_down 8, ring 5)
+ rx_len_errors: 6  rx_proto_errors: 0  rx_stalls: 3  ring_corruptions: 5  hb_saved_by_ring: 186  hdr_repairs: 0  tx_stalls: 1  rx_csum_errors: 0
+bash: line 1: /sys/kernel/debug/kmemleak: Permission denied
+bash: line 1: /sys/kernel/debug/kmemleak: Permission denied
+grep: /sys/kernel/debug/kmemleak: No such file or directory
+kmemleak reports:
+KCSAN-FILTER: 70 report(s): 0 in mlink code, 57 in core code reached via mlink, 13 other
+DMESG GATE: PASS (mlink-modem)
+=== long soak end 2026-10-27T21:01:39+05:30 chaos_bursts=12 modem_restarts=11 max_temp=63C aborted=0
+2026-10-27T21:01:40+05:30 end rc=0, frozen for 0s total, temp=51C
+EXIT=0
+## race pairs on ap since boot (incl. soaks #1/#2)
+     29 BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+     22 BUG: KCSAN: data-race in netif_tx_wake_queue / qdisc_maybe_clear_missed
+      8 BUG: KCSAN: data-race in tick_nohz_handler / tick_nohz_idle_got_tick
+      6 BUG: KCSAN: data-race in ktime_get_seconds / timekeeping_update_from_shadow.constprop.0
+      2 BUG: KCSAN: data-race in __tcp_select_window / tcp_add_backlog
+      1 BUG: KCSAN: data-race in virtqueue_get_buf_ctx_split
+      1 BUG: KCSAN: data-race in virtqueue_disable_cb
+      1 BUG: KCSAN: data-race in ata_sff_hsm_move / skb_copy_bits
+## race pairs on modem since boot (incl. soaks #1/#2)
+     26 BUG: KCSAN: data-race in netif_tx_wake_queue / qdisc_maybe_clear_missed
+     20 BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+     13 BUG: KCSAN: data-race in ktime_get_seconds / timekeeping_update_from_shadow.constprop.0
+      8 BUG: KCSAN: data-race in tick_nohz_handler / tick_nohz_idle_got_tick
+      2 BUG: KCSAN: data-race in pfifo_fast_dequeue / pfifo_fast_enqueue
+      1 BUG: KCSAN: data-race in __tcp_select_window / tcp_add_backlog

@@ -204,8 +204,10 @@ reorderings; ordering correctness rests on the LKMM litmus tests.
 | shm_chaos, 1 201 corruptions × 7 modes | no crash, KASAN clean, recover ≤ 3.2 s | `p5-chaos-debug.txt` |
 | fault knobs (dropped/delayed kicks, bad lengths) | absorbed, counted, self-healing | `p5-faults-debug.txt` |
 | static analysis | checkpatch --strict / sparse / W=1 clean | `p5-static-analysis.txt` |
-| 1-hour soak (TCP + 12 chaos bursts + 12 restarts), debug kernel | AP clean; modem: one 22 s soft lockup inside KASAN/kmemleak stack saving (no mlink frames) — open | `p5-soak-long-debug.txt` |
+| 1-hour soak (TCP + 12 chaos bursts + 12 restarts), debug kernel | AP clean; modem: one 22 s soft lockup in softirq, time spent in KASAN/kmemleak stack saving under mlink's NAPI poll (`napi_alloc_skb`) — open, not reproduced | `p5-soak-long-debug.txt` |
+| 20-min and 75-min repeats, debug kernel | dmesg gate clean on both | `p5-soak-repro-debug.txt` |
 | same 1-hour soak, **perf kernel** | dmesg gate clean on both, no lockup | `perf/p5-soak-long-perf.txt` |
+| same 1-hour soak, **KCSAN kernel** (strict) | #1: 5 races in mlink (ring local index); #2: 1 (netdev stats); both fixed; #3: **0 races in mlink code**, core-kernel races counted separately | `kcsan/p5-soak-long-kcsan-{1,2,3}.txt` |
 
 ## Caveats
 
