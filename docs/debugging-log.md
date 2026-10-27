@@ -136,6 +136,28 @@ Format: symptom → hypotheses → evidence → root cause → fix → lesson. N
 - **Lesson:** "untrusted shared memory" applies to *control* decisions too (watchdogs,
   liveness), not just lengths and indices. A fault injector finds what code review missed.
 
+## 2026-10-27 — P5.5: one 22 s soft lockup on the debug-kernel modem in a 1-h soak
+
+- **Symptom:** `watchdog: BUG: soft lockup - CPU#0 stuck for 22s! [iperf3]` on the modem, once,
+  in the first 1-h soak (`p5-soak-long-debug.txt`). Trace: `<IRQ>` → `net_rx_action` →
+  `mlink_napi_poll` → `mlink_rx_poll` → `mlink_net_rx` → `napi_alloc_skb` → KASAN/kmemleak
+  stack saving (`unwind_next_frame`).
+- **Not reproduced:** 20-min and 75-min debug soaks with IRQ/softirq sampling
+  (`p5-soak-repro-debug.txt`), 1-h perf soak (`perf/p5-soak-long-perf.txt`): all clean.
+- **Hypothesis 1, unbounded poll loop (our bug):** ruled out by review — every consumed entry
+  (errors included) counts against the NAPI budget, budget exhaustion returns `budget`, idle
+  re-arms with the SB re-check.
+- **Hypothesis 2, doorbell storm:** kick suppression is cooperative (the *peer* honours
+  `want_kick` in shm; `shm_chaos` scribbles on it), and since v6.4 net softirqs run again at
+  every hardirq exit, so a storm + KASAN-expensive allocations could pin a CPU in irq/softirq
+  context. Test `bench/run_p5_storm.sh 60 2` (`p5-storm-debug.txt`): DATA irqs 99 → 7178/s,
+  NET_RX 103 → 4471/s, throughput unchanged, **no lockup** in 60 s. Not confirmed.
+- **Status (timeboxed, fallback taken):** unresolved, debug-kernel only (the expensive frames
+  are KASAN/kmemleak instrumentation), not reproduced in 95 min of further debug soak nor on
+  the perf kernel. P5.5's criterion was met by the 75-min debug soak and the 1-h perf soak; the
+  ticked box notes the one failure. Candidate hardening if it recurs: mask the DATA MSI-X vector
+  locally while NAPI polls (as NICs mask in hardware) so the peer cannot drive our IRQ rate.
+
 ## 2026-10-27 — P9: control shell to the arm64 initramfs guest loses or delays commands
 
 - **Symptom:** commands sent to the arm64 guest's shell came back late (the output of call N

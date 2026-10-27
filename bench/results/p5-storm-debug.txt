@@ -1,0 +1,7 @@
+# P5.5 doorbell-storm test — modem kernel 6.18.59-mlink-debug — 2026-10-27T17:25:28+05:30
+# command: bash bench/run_p5_storm.sh 60 2   (storm = 2 AP shells writing DATA to ring_doorbell)
+# modem DATA irq line:  29: 3 0 PCI-MSIX-0000:00:05.0 0-edge mlink-data
+storm=0: iperf3 AP->modem 26.5 Mbit/s, modem DATA irqs/s 99, NET_RX softirqs/s 103
+  modem lockups/warnings: 0
+storm=1: iperf3 AP->modem 25.4 Mbit/s, modem DATA irqs/s 7178, NET_RX softirqs/s 4471
+  modem lockups/warnings: 0

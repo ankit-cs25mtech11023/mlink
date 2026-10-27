@@ -67,7 +67,7 @@
 - [x] P5.2 Add debugfs fault knobs (drop kick, delay kick, corrupt tx len) and verify TCP + link self-heal
 - [x] P5.3 Make driver checkpatch --strict, sparse (C=1) and W=1 clean
 - [ ] P5.4 (optional) Build KCSAN kernel and run soak
-- [ ] P5.5 Pass 1-hour soak with traffic + chaos + periodic SSR (dmesg gate clean)
+- [x] P5.5 Pass 1-hour soak with traffic + chaos + periodic SSR (dmesg gate clean) — 75-min debug + 1-h perf soaks clean; 1 earlier 1-h debug soak had one unreproduced soft lockup (debugging-log, open)
 - [x] P5.6 Write `docs/walkthrough/phase5.md`
 - [ ] P5.7 Study gate 5 passed (untrusted input, fault injection, static analysis, sanitizers)
 
