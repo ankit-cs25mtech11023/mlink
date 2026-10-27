@@ -768,6 +768,14 @@ For each phase N:
   `flags` bit `CSUM_PARTIAL` + `csum_start`/`csum_offset` in the former `rsvd` word), advertise
   `NETIF_F_HW_CSUM | NETIF_F_SG`. ABI version 1 → 2. Receiver validates start/offset from shm
   before `skb_partial_csum_set()`. Measured before/after with the same matrix commands.
+- **D18 (2026-10-27)** P7 control plane design: two control rings (16 × 1 KiB slots, one per
+  direction) in the reserved shm area at 0x206000/0x20C000 (ABI v3), reusing the ring code
+  generalised to per-ring entries/slot size; a 5th MSI-X vector CTRL (QEMU `vectors=5`,
+  `ivshmem-server -n 5`) used for both "new message" and "space freed"; QMI-like message =
+  header {msg_id, type REQ/RESP/IND, txn_id, len, result} + TLVs; `/dev/mlink_ctrl` misc device:
+  AP kernel assigns txn ids and routes RESP to the requesting file, IND broadcast; on SSR pending
+  requests get a synthetic RESP with result ENOTCONN and readers see POLLHUP until UP again.
+  Daemon `mlinkd` (modem) and CLI `mlinkctl` (AP) in tools/.
 - **D14 (2026-10-27)** Guest kernel = **v6.18.59** (latest 6.18 longterm per kernel.org
   releases.json on 2026-10-27; 7.2.13 stable / 7.3 mainline not chosen — LTS for stable APIs).
   QEMU source 10.2.2, GPG signature verified (key CEACC9E15534EBABB82D3FA03353C9CEF108B584),
