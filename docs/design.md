@@ -248,11 +248,26 @@ txn table and the file list. Control state is kref'd so open files survive an un
 → `ENODEV`). On link reset: pending requests get RESP `-ENOTCONN`, rings zeroed, readers
 `EPOLLHUP`. Daemon `mlinkd` (modem) and CLI `mlinkctl` (AP).
 
+## 12b. Other peers: Zephyr and arm64 (P8, P9; D19–D21)
+The ABI is OS- and ISA-neutral apart from byte order: the modem role has been taken by
+- a **Zephyr** image (`zephyr/mlink-modem`) that compiles `mlink_ring.c` and `mlink_shm.h`
+  unchanged through a shim mapping `READ_ONCE`/`virt_*` to volatile / C11 `__atomic`
+  operations, ports the modem half of §9, serves the control rings like `mlinkd`, and either
+  reflects packets (loopback test mode) or hands them to Zephyr's IP stack as a `DUMMY_L2`
+  (raw-IP) interface, completing CHECKSUM_PARTIAL sums first because Zephyr verifies them;
+- the same driver built for **arm64**, against the x86 AP on one region, where `virt_*` become
+  `stlr` / `ldar` / `dmb ish` (`bench/results/p9-arm64-barriers.txt`).
+What makes this work: every field has one writer, each side touches the other's fields only
+through the ring/state accessors, and nothing in shm is a pointer. A big-endian peer would
+need `__le32` fields (§6).
+
 ## 13. Known limitations
 Fixed layout (no ring-size negotiation); two copies per packet; single queue per direction;
-no TSO (GSO segments in software); no interrupt-rate limiting against a hostile peer; x86 only
-at runtime (LKMM covers the model; aarch64 is stretch); both endpoints are Linux VMs on one
-host.
+no TSO (GSO segments in software); no interrupt-rate limiting against a hostile peer (kick
+suppression is cooperative: the peer can ring DATA doorbells at will; see the P5.5 entry in
+the debugging log); the arm64 and Zephyr peers run under TCG on an x86 host, so weak-memory
+reorderings are covered by the LKMM litmus tests, not observed at runtime; all endpoints are
+VMs on one host.
 
 ## 14. Open questions for the user's review (P1.1)
 1. Fixed 4 KiB slots waste memory for small packets (a 64 B ACK uses a whole slot) — accepted
