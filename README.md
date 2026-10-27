@@ -61,6 +61,8 @@ numbers measured on a perf kernel. Full methodology and caveats: [`docs/results.
   that compiles the driver's `mlink_ring.c` unchanged through a small `virt_*`/`READ_ONCE`
   shim; loopback test mode (ICMP echo → reply with RFC 1624 checksum update, UDP reflected);
   restarts detected by the AP via generation change (recovery 44–53 ms) or heartbeat (521 ms).
+  Or, built with `net.conf`, the ring pair becomes a raw-IP Zephyr network interface with the
+  real Zephyr TCP/IP stack (TCP echo verified byte-exact, UDP echo, ping).
 - **Hardening**: host-side **shared-memory corruption injector** (`tools/shm_chaos.c`),
   driver fault knobs, lost-kick watchdogs on local facts only, header self-repair;
   `checkpatch --strict`, sparse and `W=1` clean.

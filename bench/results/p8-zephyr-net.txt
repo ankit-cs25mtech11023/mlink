@@ -1,0 +1,78 @@
+# P8.3 Zephyr IP-stack modem — 2026-10-27, laptop i5-8250U
+# AP: Linux guest, DEBUG kernel, mlink.ko role=ap (KVM).
+# Modem: zephyr/mlink-modem built with net.conf (CONFIG_MLINK_MODEM_NET): ring pair = Zephyr
+# DUMMY_L2 (raw IP) interface 10.77.0.2/24; UDP echo :7, TCP echo :7, TCP discard :9.
+# Zephyr runs under TCG: functional evidence; throughput is emulation-bound (see CPU below).
+
+## Image
+$ bash ~/D/mlink/scripts/host/zephyr-modem.sh build net
+   RAM: 568 KB        (loopback build: 276 KB)
+Kconfig: NETWORKING on QEMU targets defaults to SLIP-over-UART-pipe (took over the console:
+first boot printed nothing after "Booting from ROM") + e1000 -> net.conf sets
+CONFIG_NET_SLIP_TAP=n, CONFIG_NET_DRIVERS=n. Remaining CMake notes: timer-based (non-crypto)
+random generator (TCP ISNs; acceptable for a test modem), empty drivers__entropy library.
+
+## Bring-up
+mlink-modem: role=modem own_id=22 shm=4194304 bytes abi=3
+mlink-modem: shared header valid (abi 3)
+mlink-modem: link UP: peer id=0 gen=25, own gen=21
+
+## AP tests
+$ ping -c 10 -i 0.2 10.77.0.2                     10/10, rtt avg 2.35 ms (Zephyr ICMPv4)
+$ udp_pingpong -c 10.77.0.2 -p 7 -n 1000 -l 64 -w 50
+udp_pingpong len=64 n=1000 lost=0 busy_poll=0 min=359.7 p50=501.7 p90=614.8 p99=769.0 p999=1124.8 max=1306.4 us
+$ udp_pingpong -c 10.77.0.2 -p 7 -n 300 -l 1400 -w 20
+udp_pingpong len=1400 n=300 lost=0 busy_poll=0 min=455.3 p50=700.7 p90=828.6 p99=1146.1 p999=1313.7 max=1348.3 us
+$ python3 /mnt/share/tcp_check.py echo 10.77.0.2 -n 262144
+tcp echo: sent 262144 B, got 262144 B back, MATCH, 0.81 s, 5.2 Mbit/s both ways
+$ python3 /mnt/share/tcp_check.py echo 10.77.0.2 -n 4194304
+tcp echo: sent 4194304 B, got 4194304 B back, MATCH, 11.07 s, 6.1 Mbit/s both ways
+$ python3 /mnt/share/tcp_check.py discard 10.77.0.2 -n 33554432
+tcp discard: 33554432 B in 45.23 s = 5.9 Mbit/s
+mlink-modem: tcp :9 client done: 33554432 bytes in 45250 ms
+mlink-modem: UP gen=21 rx=52943 tx=30296 ... stack=52943 csum=52928 drop=0 badlen=0 full=0 txwait=0 txdrop=0
+  (csum = CHECKSUM_PARTIAL packets completed by the modem before net_recv_data(); 0 dropped)
+AP ethtool -S: rx_len_errors 0, rx_stalls 0, ring_corruptions 0, link_resets 0, tx_stalls 0, rx_csum_errors 0
+
+## Why ~6 Mbit/s: emulation-bound
+during a discard transfer, /proc/<zephyr qemu>/stat utime+stime over 5 s:
+zephyr qemu pid 1874962: 128% of one core over 5 s   (two TCG vCPU threads busy)
+
+## SSR with the IP stack (bash scripts/win/zephyr-ssr.sh 3 net)
+== round 1
+last_recover_us: 51474
+last_hb_age_ms:  1
+[21242.680031] mlink 0000:00:05.0: link reset: peer restarted (gen changed) (was UP)
+[21242.731554] mlink 0000:00:05.0: link UP: peer id=23 gen=22, own gen=26 (recovery 51474 us)
+max ping gap 342 ms
+[1793097484.481420] 64 bytes from 10.77.0.2: icmp_seq=1506 ttl=64 time=0.577 ms
+== round 2
+last_recover_us: 38960
+last_hb_age_ms:  5
+[21261.721169] mlink 0000:00:05.0: link reset: peer restarted (gen changed) (was UP)
+[21261.760333] mlink 0000:00:05.0: link UP: peer id=24 gen=23, own gen=27 (recovery 38960 us)
+max ping gap 328 ms
+[1793097503.216396] 64 bytes from 10.77.0.2: icmp_seq=1477 ttl=64 time=0.566 ms
+== round 3
+last_recover_us: 40251
+last_hb_age_ms:  1
+[21280.880011] mlink 0000:00:05.0: link reset: peer restarted (gen changed) (was UP)
+[21280.920590] mlink 0000:00:05.0: link UP: peer id=25 gen=24, own gen=28 (recovery 40251 us)
+max ping gap 337 ms
+[1793097522.046525] 64 bytes from 10.77.0.2: icmp_seq=1429 ttl=64 time=0.702 ms
+then: tcp echo 256 KiB MATCH on the restarted modem.
+
+## TCP connection open across a modem crash
+AP: tcp_check.py discard 10.77.0.2 -n 33554432 (running); laptop 16:11:04 IST: zephyr-modem.sh stop + run net
+AP 10:41:06 UTC (= 16:11:06 IST): ConnectionResetError: [Errno 104] Connection reset by peer
+[AP] link reset: peer restarted (gen changed) (was UP)
+[AP] link UP: peer id=28 gen=28, own gen=31 (recovery 47986 us)
+  -> the restarted modem has no state for the connection and RSTs it: the AP app learns in
+     ~2 s (a modem crash loses its sockets, as on real hardware). With the modem dead and NOT
+     restarted, the same transfer instead failed with TimeoutError after the 30 s socket timeout.
+
+## Not exercised
+Ring B full (Zephyr TX blocked on want_space/SPACE): txwait=0 in all runs. Zephyr's TX is
+mostly ACKs/echoes at TCG speed, so the AP never fell behind.
+
+## Restore: Zephyr stopped, Linux modem reloaded, bash scripts/win/test.sh -> TEST: PASS

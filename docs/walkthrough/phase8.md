@@ -100,7 +100,41 @@ Modems have a "loopback test mode" that bounces IP traffic back. Rules:
   summary line.
 - Timings with the modem under TCG are functional, not performance numbers.
 
-## 6. Questions to be ready for
+## 6. P8.3 — the real Zephyr IP stack on the ring (`src/net.c`, D20)
+
+Built with `zephyr-modem.sh build net` (`net.conf` sets `CONFIG_MLINK_MODEM_NET`); the same
+`main.c` link/ring core, but packets go to Zephyr's stack instead of `reflect()`.
+
+- **Raw IP on both sides.** Linux registers `mlink0` as `ARPHRD_RAWIP` (no link header, like
+  `mhi_net`); Zephyr's equivalent is a `DUMMY_L2` interface (`NET_DEVICE_INIT(... DUMMY_L2 ...)`).
+  The Zephyr net core looks at the version nibble to choose IPv4/IPv6, so nothing else is
+  needed: the ring payload is the IP packet.
+- **Checksum completion (key lines: `csum_complete()`).** The AP sends TCP/UDP as
+  CHECKSUM_PARTIAL (D17): the checksum field holds only the pseudo-header seed. Linux on the
+  modem side would pass that on as CHECKSUM_PARTIAL; Zephyr's stack *verifies* L4 checksums, so
+  the modem finishes the sum over `[csum_start, len)` and stores `~sum` (0 → 0xffff) like
+  `skb_checksum_help()`. `csum_start/csum_offset` are peer-written, so they are bounded against
+  the packet length before use. 52 928 packets were completed this way in one TCP run.
+- **Who produces into ring B now? (key lines: `mlink_net_send()`).** In loopback mode only the
+  poll thread produced. Now `send()` is called from Zephyr's net and socket threads, so several
+  threads could produce: the ring is single-producer by design, so a `k_mutex` makes them take
+  turns. The link reset zeroes the producer index under the same mutex, after clearing
+  `link_up` (same order as the Linux reset: stop new work first, then reset).
+- **Full ring:** arm `want_space` + re-check (SB pattern), then **drop the mutex** and sleep on
+  a semaphore that the SPACE doorbell gives, with a 100 ms timeout. Holding the mutex while
+  sleeping would block the link reset; the timeout doubles as a lost-kick watchdog.
+- **Kconfig trap.** On QEMU boards `NETWORKING=y` defaults to SLIP over a UART pipe, which took
+  over the serial console: the first boot printed nothing after SeaBIOS. `NET_SLIP_TAP=n` +
+  `NET_DRIVERS=n` leaves `mlink0` as the only interface.
+
+Results (`bench/results/p8-zephyr-net.txt`): ping, UDP echo 64/1400 B (0 lost), TCP echo 4 MiB
+byte-exact, TCP discard 32 MiB at ~6 Mbit/s (the Zephyr QEMU used 128 % of a core: TCG-bound),
+SSR 3 rounds (recovery 39–51 ms). A TCP connection open across a modem crash gets
+**ECONNRESET ~2 s** after the restart (the new modem RSTs a connection it has no state for);
+with the modem left dead the same client instead times out after 30 s. Not exercised: ring B
+full (Zephyr never out-produced the AP).
+
+## 7. Questions to be ready for
 
 1. Why must `virt_mb()` be a real fence on a uniprocessor Zephyr build?
 2. Why does reflecting a CHECKSUM_PARTIAL UDP packet need no checksum work at all?
@@ -109,3 +143,8 @@ Modems have a "loopback test mode" that bounces IP traffic back. Rules:
 5. The AP detected the restart in ~1 ms of heartbeat age. Which check fired, and why first?
 6. Spot the bug: an earlier `reflect()` required `tot >= ihl + 8` for every packet. What broke?
 7. What does Zephyr do when ring B is full, and how does the AP learn it may send again?
+8. Why does the IP-stack mode need a mutex on ring B when the loopback mode does not?
+9. Why must `mlink_net_send()` release the mutex before sleeping on the SPACE semaphore?
+10. Why does the modem have to complete CHECKSUM_PARTIAL checksums, while a Linux modem would not?
+11. A TCP transfer dies with ECONNRESET after a modem restart, but with a timeout when the modem
+    stays dead. Explain both.

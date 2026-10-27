@@ -18,6 +18,6 @@ F=$1
 S="$HOME/D/mlink-work/share"
 make -C "$HOME/D/mlink/driver" KFLAVOUR="$F"
 cp "$HOME/D/mlink/driver/mlink.ko" "$S/mlink.ko"
-cp "$HOME/D/mlink/scripts/guest/"*.sh "$S/"
+cp "$HOME/D/mlink/scripts/guest/"*.sh "$HOME/D/mlink/tools/"*.py "$S/"
 echo "staged: $(modinfo -F vermagic "$S/mlink.ko")"
 EOF

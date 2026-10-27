@@ -52,7 +52,16 @@
   Run it: modem guest `bash /mnt/share/mlink-down.sh`; laptop
   `tmux new -d -s zmodem 'bash ~/D/mlink/scripts/host/zephyr-modem.sh run'`;
   SSR rounds: `bash scripts/win/zephyr-ssr.sh 5`. Restore: `zephyr-modem.sh stop` + test.sh.
-- State at end: Zephyr stopped, Linux AP+modem on the debug kernel, test.sh PASS.
+- State at end of P8.2: Zephyr stopped, Linux AP+modem on the debug kernel, test.sh PASS.
+- **P8.3 DONE** (D20): `zephyr/mlink-modem/src/net.c` — DUMMY_L2 raw-IP iface 10.77.0.2/24,
+  UDP echo :7, TCP echo :7, TCP discard :9; Kconfig `MLINK_MODEM_NET` via `net.conf`
+  (`NET_SLIP_TAP=n`, `NET_DRIVERS=n`: SLIP had taken over the console). Ping/UDP/TCP echo
+  byte-exact/discard ~6 Mbit/s (TCG-bound, 128 % core), SSR 3 rounds, TCP across modem crash →
+  ECONNRESET ~2 s. Evidence `bench/results/p8-zephyr-net.txt`, phase8.md §6.
+  Run: `zephyr-modem.sh build net`, `tmux new -d -s zmodem '... zephyr-modem.sh run net'`,
+  AP `python3 /mnt/share/tcp_check.py echo|discard 10.77.0.2 -n N`, `zephyr-ssr.sh 3 net`.
+  Gotcha: on the laptop (zsh) `$VAR` holding a command is NOT word-split; spell commands out.
+- State at end of P8: Zephyr stopped, Linux AP+modem (debug kernel), test.sh PASS.
 
 ## (older) P8.1 Zephyr risk check notes
 - Workspace `~/D/mlink-work/zephyr/`: Zephyr **v4.4.2** (core repo only, shallow,
@@ -79,11 +88,9 @@
   `CONFIG_IVSHMEM_MSI_X_VECTORS` default 2 vs device vectors=5.
 
 ## Next
-1. P8.3 (optional): Zephyr net driver on the ring with the real Zephyr IP stack (`net_if`
-   with `NET_L2_DUMMY`/raw IP), so the modem answers TCP too. Or skip to P9.
+1. P9 aarch64 guest: needs `qemu-system-arm` + `gcc-aarch64-linux-gnu` (msudo apt, allowed:
+   project packages), arm64 kernel build (long, tmux + thermal-run), TCG guest, driver selftest
+   + ping, weak-memory discussion. P10 needs the user's SMTP; P11 needs hardware.
 2. Optional: Zephyr serving a minimal control-plane responder (GET_LINK_INFO) on rings C/D.
-3. Alternatives if Zephyr stalls: P9 aarch64 guest (needs `qemu-system-arm` +
-   `gcc-aarch64-linux-gnu` via msudo apt; TCG; arm64 kernel build). P10 needs the user's SMTP,
-   P11 needs hardware.
 4. Open issue: debug-kernel soft lockup (P5.5) seen once in a 1-h soak; not reproduced in 20 +
    75 min debug soaks; perf 1-h soak clean. Evidence `bench/results/p5-soak-*`.

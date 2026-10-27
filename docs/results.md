@@ -179,6 +179,11 @@ these are interop results, not performance numbers.
 | modem killed, not restarted | heartbeat timeout, 521 ms after the last heartbeat |
 | AP driver reloaded | Zephyr re-handshakes, ping OK |
 
+With Zephyr's own IP stack on the ring (P8.3, `bench/results/p8-zephyr-net.txt`, 568 KB RAM):
+ping and UDP echo (0 lost), TCP echo 4 MiB byte-exact, TCP discard 32 MiB at ~6 Mbit/s
+(TCG-bound: the Zephyr QEMU used 128 % of a core), SSR recovery 39–51 ms, and a TCP connection
+open across a modem crash ends with ECONNRESET ~2 s after the restart.
+
 ## Correctness evidence (debug kernel)
 
 | test | result | file |
