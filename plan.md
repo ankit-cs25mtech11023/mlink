@@ -811,7 +811,8 @@ For each phase N:
   heartbeat/handshake; loopback rewrites ICMP echo request → reply (RFC 1624 incremental
   checksum) and swaps UDP addresses + ports (a CHECKSUM_PARTIAL pseudo-header sum is
   symmetric under the swap, so desc flags/csum fields are reflected as-is); anything else is
-  dropped and counted. Control rings (P7) are not served by Zephyr (AP requests time out).
+  dropped and counted. Control rings (P7) are not served by Zephyr (AP requests time out) —
+  superseded under D22: `src/ctrl.c` serves them (mlinkd semantics, mlink_ctrl_lib.h helpers).
 - **D22 (2026-10-27)** User: no hardware → **P11 descoped**. Finish everything that is not the
   user's reading (study gates, design review, resume approval, grill stay with the user).
   P10 = QEMU ivshmem-client stdin-EOF busy-loop fix, from cs25mtech11023@iith.ac.in (the
