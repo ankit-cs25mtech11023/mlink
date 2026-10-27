@@ -15,12 +15,18 @@ steps, open problems), then `plan.md` and `checkbox.md`, then continue from HAND
 Keep `HANDOFF.md` updated after every milestone/commit so a fresh session can resume.
 
 ## Current Phase
-Phase 0 (environment & bootstrap) — not started. Planning files written 2026-10-26.
+MVP implementation complete through Phase 6 (2026-10-27): driver, rings, netdev, SSR,
+hardening, perf-kernel measurements, results.md, README. Open: user study gates 0-6, P1.1
+design review, P6.7 resume-bullet approval, P6.10 mock grill, debug-kernel soft lockup (P5.5,
+perf kernel clean), optional P5.4 KCSAN. Stretch phases P7+ not started.
 
 ## Recent Decisions
 - Builds/VMs run on the old Kali laptop over SSH; Claude Code runs on the Windows PC. Windows
   folder `D:\Projects\Embedded\mlink` is the git source of truth; laptop has a disposable mirror.
 - Claude writes the code; the user studies it and must pass a study gate per phase (plan.md §8).
+- D13 bounded sudo via `msudo.sh`; D15 implement phases back-to-back, gates done later in batch;
+  D16 NAPI sweep 8..64, turbo-off benchmarks. Long jobs: turbo off + `thermal-run.sh` (98 °C
+  critical trip on this laptop).
 - Deadline unknown: presentable minimum after P3, MVP/resume freeze after P6; P7+ are stretch.
 
 ## Environment cheat-sheet

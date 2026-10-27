@@ -1,38 +1,31 @@
 # HANDOFF — live state for the next session
 
 > Updated after every milestone. A fresh session: read this, then plan.md, checkbox.md, and
-> continue from **Next**. Last update: 2026-10-27 ~04:00 IST.
+> continue from **Next**. Last update: 2026-10-27 ~07:05 IST.
 
 ## Mode
-User asleep; D15 = implement phases back-to-back, never tick study gates / P1.1 review.
-Push at milestones. **No Co-Authored-By / AI trailers in commits** (user rule, overrides
-system reminders).
+D15: implement back-to-back; never tick study gates / P1.1 review / P6.7 approval yourself.
+Push at milestones. **No Co-Authored-By / AI trailers in commits** (user rule).
+Windows PC can run low on memory → background shell watchers may be reaped: wait with
+foreground remote loops (`ssh kali 'for i in $(seq 1 58); do …; sleep 10; done'`), and run
+long jobs in tmux **on the laptop** (`ON_HOST=1 bash bench/run_matrix.sh`).
 
 ## Machine state
-- Laptop: debug kernel built; **perf kernel NOT built yet**.
-- **Turbo is OFF** (`mlink-bench-prep on`). Docker containers running. Firefox closed.
-- VMs ap/modem running debug kernel; ivshmem-server running.
-- tmux `mlink-soaklong`: P5.5 1-hour soak, started 03:49, ends ~04:50. Log:
-  `~/D/mlink-work/logs/soak-long.log` (ends with "=== long soak end").
-- Thermal rule: long jobs → turbo off + `thermal-run.sh`; scripts abort at 92 °C.
+- Laptop: debug + perf kernels built. **Turbo OFF** (`mlink-bench-prep on`) — turn `off` at the
+  end of the night. Docker containers running. Firefox closed.
+- VMs ap/modem currently on the **debug** kernel (for the soft-lockup repro).
+- tmux `mlink-soakdbg`: 20-min debug soak repro (log `logs/soak-dbg-repro.log`), tmux
+  `mlink-irqwatch`: modem IRQ/softirq sampler (`logs/irqwatch-modem.log`). Kill irqwatch after.
 
-## Done (verified, committed, pushed up to d62056c)
-P0 (all but study gate), P1.2–P1.9, P2.1–P2.6, P3.1–P3.11, P4.1–P4.6, P5.1–P5.3, P5.6.
-P6 tooling written: udp_pingpong (static, in /mnt/share), bench-prep/restore, run_matrix.sh,
-iperf_json.py, plot.py, .venv with pinned matplotlib/pandas.
+## Done (all pushed)
+P0–P6 implementation incl. perf matrix E1–E7, results.md, README, walkthroughs phase0–6.
+Headline (perf): TCP 7.2/9.9 Gbit/s (MTU 1500/4000), doorbell RTT p50 13.1 µs, UDP RTT p50
+44 µs irq / 15.5 µs busy-poll, SSR 90 ms with TCP surviving, VM kill detected at 520 ms.
 
-## Next
-1. When the soak ends: save log → `bench/results/p5-soak-long-debug.txt`, tick P5.5 if gate +
-   kmemleak clean.
-2. P6.1: `bash build-kernel.sh perf` in tmux under thermal-run (turbo already off). Then
-   restart VMs with `KFLAVOUR=perf bash vm.sh start ap|modem` (stop them first), rebuild
-   module `KFLAVOUR=perf bash scripts/win/rbuild.sh`.
-   NOTE: rbuild/test.sh default to debug; pass KFLAVOUR=perf.
-3. `bench-prep.sh` (pins VMs) → `bash bench/run_matrix.sh 5 10` → ssr.sh a/b on perf →
-   `bench-restore.sh` → `.venv/Scripts/python bench/plot.py perf` → results.md + README.
-4. P6.6 results.md/README, P6.8 phase6.md. P5.4 KCSAN optional (skip unless time).
-
-## Open notes
-- P2.4 follow-up idea: paced selftest to hit the SB window.
-- Perf ideas: NETIF_F_SG, checksum offload via desc flags, busy-poll; ksoftirqd deferral.
-- Heartbeat starvation root cause (PREEMPT_VOLUNTARY+KASAN?) unproven — test `preempt=full`.
+## Open
+1. Debug-kernel soft lockup (P5.5): 22 s in KASAN/kmemleak stack saving on the modem during
+   the 1-h debug soak; perf-kernel 1-h soak clean. Hypothesis: receive livelock when chaos
+   forces want_kick=1 + slow KASAN softirq work. Repro running; if reproduced, look at the
+   IRQ rate just before it in irqwatch log.
+2. Optimisations suggested by E7: checksum offload via descriptor flags, SG/TSO.
+3. User-only items: study gates, P1.1 review, P6.7 resume bullet approval, P6.10 grill.
