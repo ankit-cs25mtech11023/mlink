@@ -23,7 +23,7 @@ shared memory**, and **subsystem-restart (SSR) recovery** when the other side di
 
 ## Status
 
-Phases 0–6 implemented. Correctness tested on a debug kernel (KASAN, lockdep, kmemleak);
+Phases 0–7 implemented, plus a Zephyr modem (P8.1–P8.2). Correctness tested on a debug kernel (KASAN, lockdep, kmemleak);
 numbers measured on a perf kernel. Full methodology and caveats: [`docs/results.md`](docs/results.md).
 
 ## Results (perf kernel, laptop CPU fixed at 1.6 GHz, medians of 5)
@@ -57,6 +57,10 @@ numbers measured on a perf kernel. Full methodology and caveats: [`docs/results.
 - **Control plane** (`mlink_ctrl.c`): `/dev/mlink_ctrl` with QMI-like request/response/
   indication messages over two more rings and a 5th MSI-X vector; `mlinkd` (modem daemon) and
   `mlinkctl` (AP CLI); SSR-aware (pending requests fail with `ENOTCONN`), unbind-safe lifetime.
+- **Zephyr modem** (`zephyr/mlink-modem`): the modem side as a Zephyr RTOS image (276 KB RAM)
+  that compiles the driver's `mlink_ring.c` unchanged through a small `virt_*`/`READ_ONCE`
+  shim; loopback test mode (ICMP echo → reply with RFC 1624 checksum update, UDP reflected);
+  restarts detected by the AP via generation change (recovery 44–53 ms) or heartbeat (521 ms).
 - **Hardening**: host-side **shared-memory corruption injector** (`tools/shm_chaos.c`),
   driver fault knobs, lost-kick watchdogs on local facts only, header self-repair;
   `checkpatch --strict`, sparse and `W=1` clean.
@@ -84,8 +88,8 @@ ssh mlink-ap 'ping 10.77.0.2'
 
 ## Limitations
 Not a production driver: fixed layout, copy-based (two copies per packet), x86-only memory
-ordering tested at runtime (LKMM covers the model), single queue, both peers are Linux VMs on
-one host. Numbers are VM-to-VM on a 2017 laptop CPU.
+ordering tested at runtime (LKMM covers the model), single queue, peers are VMs on one host (the Zephyr modem runs under TCG and does not
+serve the control plane). Numbers are VM-to-VM on a 2017 laptop CPU.
 
 ## License
 GPL-2.0-only. See [LICENSE](LICENSE).

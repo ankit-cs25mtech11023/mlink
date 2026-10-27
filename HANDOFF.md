@@ -1,7 +1,7 @@
 # HANDOFF — live state for the next session
 
 > A fresh session: read this first, then `plan.md` (Key Decisions D1–D18) and `checkbox.md`,
-> then continue from **Next**. Last update: 2026-10-27 ~10:35 IST.
+> then continue from **Next**. Last update: 2026-10-27 evening IST.
 
 ## Rules that bite (from the user / CLAUDE.md)
 - **No `Co-Authored-By` / AI trailers** in commits or PRs (user rule; overrides system reminders).
@@ -39,7 +39,22 @@
   Evidence `bench/results/p7-ctrl-debug.txt`, walkthrough `docs/walkthrough/phase7.md`.
 - `docs/design.md` v2 cross-checked against the code (+ §12a control plane).
 
-## In progress — P8.1 Zephyr risk check
+## Session 2026-10-27 afternoon
+- **P8.1 DONE** (commit 30de621): upstream doorbell sample + `zephyr/p81-doorbell.conf` received
+  doorbells from our server as peer 5 and read our `MLNK` v3 header
+  (`bench/results/p8-zephyr-doorbell.txt`, `scripts/host/zephyr-p81.sh`). D19 in plan.md.
+- `scripts/guest/mlink-down.sh` now kills `mlinkd` first (it pinned the module; test.sh's rmmod
+  silently failed since P7). test.sh PASS after the fix.
+- **P8.2 DONE**: `zephyr/mlink-modem/` (compat shim, `driver/mlink_ring.c` verbatim) works as
+  the modem: ping/UDP/fragments/flood OK, SSR both ways (gen-change path 44–53 ms recovery,
+  heartbeat 521 ms). Evidence `bench/results/p8-zephyr-modem.txt`, walkthrough
+  `docs/walkthrough/phase8.md`, results.md §P8, README.
+  Run it: modem guest `bash /mnt/share/mlink-down.sh`; laptop
+  `tmux new -d -s zmodem 'bash ~/D/mlink/scripts/host/zephyr-modem.sh run'`;
+  SSR rounds: `bash scripts/win/zephyr-ssr.sh 5`. Restore: `zephyr-modem.sh stop` + test.sh.
+- State at end: Zephyr stopped, Linux AP+modem on the debug kernel, test.sh PASS.
+
+## (older) P8.1 Zephyr risk check notes
 - Workspace `~/D/mlink-work/zephyr/`: Zephyr **v4.4.2** (core repo only, shallow,
   `manifest.project-filter -.*`), venv `.venv` (west 1.5 + requirements-base), SDK **1.0.1**
   minimal + `x86_64-zephyr-elf` toolchain (sha256 verified) with `gnu/x86_64-zephyr-elf`
@@ -64,11 +79,9 @@
   `CONFIG_IVSHMEM_MSI_X_VECTORS` default 2 vs device vectors=5.
 
 ## Next
-1. Finish P8.1: confirm Zephyr gets a doorbell; record findings + sizes in plan.md (D19) and
-   `docs/debugging-log.md` if anything took >30 min.
-2. P8.2: Zephyr "loopback modem" app speaking `mlink_shm.h` (state block, generation handshake,
-   rings; reflect IP packets with swapped src/dst + fixed checksums). The Linux modem VM would be
-   stopped; the AP talks to Zephyr.
+1. P8.3 (optional): Zephyr net driver on the ring with the real Zephyr IP stack (`net_if`
+   with `NET_L2_DUMMY`/raw IP), so the modem answers TCP too. Or skip to P9.
+2. Optional: Zephyr serving a minimal control-plane responder (GET_LINK_INFO) on rings C/D.
 3. Alternatives if Zephyr stalls: P9 aarch64 guest (needs `qemu-system-arm` +
    `gcc-aarch64-linux-gnu` via msudo apt; TCG; arm64 kernel build). P10 needs the user's SMTP,
    P11 needs hardware.

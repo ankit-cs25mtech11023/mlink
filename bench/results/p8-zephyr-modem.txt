@@ -1,0 +1,91 @@
+# P8.2 Zephyr loopback modem — 2026-10-27, laptop i5-8250U
+# AP: Linux guest, DEBUG kernel (6.18.59-mlink debug), mlink.ko role=ap, KVM.
+# Modem: Zephyr v4.4.2 qemu_x86_64 under TCG (no KVM), zephyr/mlink-modem, which
+# builds driver/mlink_ring.c verbatim (compat shim). Linux modem guest booted, mlink unloaded.
+# All RTTs below include TCG emulation of the modem: functional evidence, not performance.
+
+## Image
+$ bash ~/D/mlink/scripts/host/zephyr-modem.sh build     (0 warnings after -Wno-pointer-arith for mlink_ring.c)
+   text    data     bss     dec     hex filename
+ 136472     657  165936  303065   49fd9 zephyr.elf
+             RAM:        276 KB        31 MB      0.87%
+
+## Bring-up (zephyr-modem-serial.log / AP dmesg)
+mlink-modem: role=modem own_id=8 shm=4194304 bytes abi=3
+mlink-modem: shared header valid (abi 3)
+mlink-modem: peer found: id=0 gen=10
+mlink-modem: link UP: peer id=0 gen=10, own gen=8
+[AP] mlink 0000:00:05.0: peer found: id=8 gen=8
+[AP] mlink 0000:00:05.0: link UP: peer id=8 gen=8, own gen=10 (recovery 0 us)
+
+## Data path (AP commands)
+$ ping -c 20 -i 0.2 10.77.0.2                  20/20, rtt avg 1.85 ms
+$ ping -c 5 -s 3000 10.77.0.2   (MTU 1500)      5/5   (IP fragments reflected; failed 5/5 before the fragment fix)
+$ ip link set mlink0 mtu 4000; ping -c 3 -s 3900 -M do 10.77.0.2     3/3
+$ udp_pingpong -c 10.77.0.2 -n 2000 -l 64 -w 100
+udp_pingpong len=64 n=2000 lost=0 busy_poll=0 min=217.2 p50=293.7 p90=388.8 p99=510.1 p999=709.1 max=785.3 us
+$ udp_pingpong -c 10.77.0.2 -n 500 -l 3000 -w 50
+udp_pingpong len=3000 n=500 lost=0 busy_poll=0 min=203.9 p50=259.7 p90=319.3 p99=454.7 p999=705.5 max=797.2 us
+  (UDP sent CHECKSUM_PARTIAL; reflected with desc csum fields unchanged; accepted by the socket)
+
+$ nstat -n; ping -f -l 400 -c 10000 -q 10.77.0.2; sleep 3; nstat
+10000 packets transmitted, 8147 received, 18.53% packet loss      <- ping's own view
+IcmpOutEchos 10000   IcmpInEchoReps 10000                         <- AP IP layer: link lost 0
+  (replies arrive in bursts behind the slow TCG modem; ping -f misses some at the socket.
+   Not a link loss: every request was answered and delivered to the AP stack.)
+ethtool -S mlink0: rx_stalls 0, tx_stalls 0, ring_corruptions 0, rx_csum_errors 0
+
+## SSR 1: modem crash + immediate restart under 10 ms ping   (bash scripts/win/zephyr-ssr.sh 5)
+== round 1
+last_recover_us: 49435
+last_hb_age_ms:  1
+[19225.544770] mlink 0000:00:05.0: link reset: peer restarted (gen changed) (was UP)
+[19225.594515] mlink 0000:00:05.0: link UP: peer id=13 gen=14, own gen=16 (recovery 49435 us)
+max ping gap 319 ms
+[1793095467.187180] 64 bytes from 10.77.0.2: icmp_seq=1488 ttl=64 time=0.371 ms
+== round 2
+last_recover_us: 52535
+last_hb_age_ms:  1
+[19244.833798] mlink 0000:00:05.0: link reset: peer restarted (gen changed) (was UP)
+[19244.887228] mlink 0000:00:05.0: link UP: peer id=14 gen=15, own gen=17 (recovery 52535 us)
+max ping gap 322 ms
+[1793095486.143239] 64 bytes from 10.77.0.2: icmp_seq=1465 ttl=64 time=0.444 ms
+== round 3
+last_recover_us: 48973
+last_hb_age_ms:  1
+[19262.853033] mlink 0000:00:05.0: link reset: peer restarted (gen changed) (was UP)
+[19262.902591] mlink 0000:00:05.0: link UP: peer id=15 gen=16, own gen=18 (recovery 48973 us)
+max ping gap 334 ms
+[1793095503.393948] 64 bytes from 10.77.0.2: icmp_seq=1340 ttl=64 time=0.421 ms
+== round 4
+last_recover_us: 44124
+last_hb_age_ms:  5
+[19281.656061] mlink 0000:00:05.0: link reset: peer restarted (gen changed) (was UP)
+[19281.700250] mlink 0000:00:05.0: link UP: peer id=16 gen=17, own gen=19 (recovery 44124 us)
+max ping gap 338 ms
+[1793095522.209718] 64 bytes from 10.77.0.2: icmp_seq=1478 ttl=64 time=0.877 ms
+== round 5
+last_recover_us: 43664
+last_hb_age_ms:  1
+[19299.424277] mlink 0000:00:05.0: link reset: peer restarted (gen changed) (was UP)
+[19299.467988] mlink 0000:00:05.0: link UP: peer id=17 gen=18, own gen=20 (recovery 43664 us)
+max ping gap 343 ms
+[1793095540.194705] 64 bytes from 10.77.0.2: icmp_seq=1389 ttl=64 time=1.18 ms
+  -> Zephyr reboots inside hb_timeout_ms (500): detected by the new modem gen, not by the
+     heartbeat. Recovery (detect -> UP) 44-53 ms; ping gap 319-343 ms (mostly Zephyr boot).
+
+## SSR 2: modem crash, no restart
+$ zephyr-modem.sh stop; sleep 3; (AP) grep . /sys/kernel/debug/mlink/link
+link_resets:     9 (hb_timeout 1, peer_gen 8, peer_down 0, ring 0)
+last_hb_age_ms:  521
+[AP] link reset: heartbeat timeout (was UP)     carrier 0
+(restart) [AP] link UP: peer id=18 gen=19, own gen=21; ping 3/3
+
+## SSR 3: AP driver reload (mlink-down.sh; mlink-up.sh ap)
+mlink-modem: peer gone
+mlink-modem: link reset: peer went down (was UP)
+mlink-modem: peer found: id=0 gen=12
+mlink-modem: link UP: peer id=0 gen=12, own gen=10
+(AP) ping -c 5: 5/5
+
+## Restore: Zephyr stopped, Linux modem reloaded, bash scripts/win/test.sh -> TEST: PASS

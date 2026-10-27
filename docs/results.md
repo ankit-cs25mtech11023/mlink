@@ -165,6 +165,20 @@ single cost (14 % AP / 11 % modem of all samples). Busy-poll UDP p50 measured 20
 vs 15.5 µs before — D17 does not touch that path; treated as run-to-run variation (both reported).
 Debug kernel: TCP 47 → ~107 Mbit/s; chaos campaign re-run clean (`p5-chaos-d17-debug.txt`).
 
+## P8 — Zephyr modem interop (`bench/results/p8-zephyr-modem.txt`)
+
+The Linux modem replaced by a Zephyr v4.4.2 loopback modem (`zephyr/mlink-modem`, 276 KB RAM)
+built on the same `driver/mlink_ring.c`. AP on the debug kernel; Zephyr under **TCG**, so
+these are interop results, not performance numbers.
+
+| Test | Result |
+|---|---|
+| ping (incl. fragmented 3000 B, 3900 B at MTU 4000), UDP pingpong 2 500 round trips | 0 lost |
+| flood, 10 000 echoes, 400 in flight | `nstat`: 10 000 requests out, 10 000 replies in at the AP |
+| modem killed + restarted, 5 rounds | detected by gen change; recovery 44–53 ms; ping gap 319–343 ms |
+| modem killed, not restarted | heartbeat timeout, 521 ms after the last heartbeat |
+| AP driver reloaded | Zephyr re-handshakes, ping OK |
+
 ## Correctness evidence (debug kernel)
 
 | test | result | file |

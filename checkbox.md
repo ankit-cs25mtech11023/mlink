@@ -96,7 +96,7 @@
 
 ## Phase 8: (stretch) Zephyr "modem"
 - [x] P8.1 Risk check: Zephyr ivshmem doorbell board support and SDK footprint on laptop
-- [ ] P8.2 Zephyr loopback-modem app speaking the same shm ABI (D19: ring code shared verbatim, ping + UDP reflect, SSR both ways)
+- [x] P8.2 Zephyr loopback-modem app speaking the same shm ABI (D19: ring code shared verbatim, ping + UDP reflect, SSR both ways)
 - [ ] P8.3 (optional) Zephyr net driver on the ring with real Zephyr IP stack
 
 ## Phase 9: (stretch) aarch64 guest
