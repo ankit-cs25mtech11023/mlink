@@ -17,12 +17,18 @@
 
 #include "mlink_ring.h"
 
-void mlink_ring_attach(struct mlink_ring *r, void *base, bool producer)
+/*
+ * Same layout for every ring (control block, descriptor page, slots); the
+ * data rings and the control rings differ only in entries and slot size.
+ */
+void mlink_ring_attach(struct mlink_ring *r, void *base, u32 entries, u32 slot_size)
 {
 	r->ctrl = base + MLINK_RING_CTRL_OFF;
 	r->desc = base + MLINK_RING_DESC_OFF;
 	r->slots = base + MLINK_RING_SLOTS_OFF;
-	r->mask = MLINK_RING_ENTRIES - 1;
+	r->entries = entries;	/* power of two, checked by static_assert */
+	r->mask = entries - 1;
+	r->slot_size = slot_size;
 	r->idx = 0;	/* the link state machine resets the shared fields */
 }
 
@@ -51,16 +57,16 @@ int mlink_ring_free(struct mlink_ring *r)
 	u32 cons = virt_load_acquire(&r->ctrl->cons.val);
 	u32 used = r->idx - cons;	/* unsigned wrap-around is intended */
 
-	if (unlikely(used > MLINK_RING_ENTRIES)) {
+	if (unlikely(used > r->entries)) {
 		r->seen = cons;
 		return -EIO;
 	}
-	return MLINK_RING_ENTRIES - used;
+	return r->entries - used;
 }
 
 void *mlink_ring_slot(struct mlink_ring *r)
 {
-	return r->slots + (size_t)(r->idx & r->mask) * MLINK_SLOT_SIZE;
+	return r->slots + (size_t)(r->idx & r->mask) * r->slot_size;
 }
 
 /* Caller has filled mlink_ring_slot() and checked mlink_ring_free() > 0. */
@@ -118,7 +124,7 @@ int mlink_ring_peek(struct mlink_ring *r, struct mlink_rx_desc *d)
 
 	if (!avail)
 		return 0;
-	if (unlikely(avail > MLINK_RING_ENTRIES)) {
+	if (unlikely(avail > r->entries)) {
 		r->seen = prod;
 		return -EIO;
 	}
@@ -131,8 +137,8 @@ int mlink_ring_peek(struct mlink_ring *r, struct mlink_rx_desc *d)
 	d->seq = READ_ONCE(sd->seq);
 	d->csum_start = READ_ONCE(sd->csum_start);
 	d->csum_offset = READ_ONCE(sd->csum_offset);
-	d->data = r->slots + (size_t)(r->idx & r->mask) * MLINK_SLOT_SIZE;
-	if (unlikely(!d->len || d->len > MLINK_SLOT_SIZE))
+	d->data = r->slots + (size_t)(r->idx & r->mask) * r->slot_size;
+	if (unlikely(!d->len || d->len > r->slot_size))
 		return -EMSGSIZE;
 	return avail;
 }

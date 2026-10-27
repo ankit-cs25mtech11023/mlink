@@ -124,15 +124,28 @@ static irqreturn_t mlink_test_irq(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
+/* Control ring: new messages and/or space freed (P7). */
+static irqreturn_t mlink_ctrl_vec_irq(int irq, void *data)
+{
+	struct mlink_dev *mdev = data;
+
+	atomic_long_inc(&mdev->irq_count[MLINK_VEC_CTRL]);
+	trace_mlink_irq(MLINK_VEC_CTRL);
+	if (READ_ONCE(mdev->ready))
+		mlink_ctrl_irq(mdev);
+	return IRQ_HANDLED;
+}
+
 static const irq_handler_t mlink_irq_handlers[MLINK_NR_VECTORS] = {
 	[MLINK_VEC_DATA]  = mlink_data_irq,
 	[MLINK_VEC_SPACE] = mlink_space_irq,
 	[MLINK_VEC_STATE] = mlink_state_irq,
 	[MLINK_VEC_TEST]  = mlink_test_irq,
+	[MLINK_VEC_CTRL]  = mlink_ctrl_vec_irq,
 };
 
 static const char * const mlink_irq_names[MLINK_NR_VECTORS] = {
-	"mlink-data", "mlink-space", "mlink-state", "mlink-test",
+	"mlink-data", "mlink-space", "mlink-state", "mlink-test", "mlink-ctrl",
 };
 
 /* ---- shared header and state blocks ------------------------------------- */
@@ -249,11 +262,15 @@ static int mlink_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	/* Ring A carries AP -> MODEM, ring B MODEM -> AP. */
 	if (mdev->role == MLINK_ROLE_AP) {
-		mlink_ring_attach(&mdev->tx, mdev->shm + MLINK_RING_A_OFF, true);
-		mlink_ring_attach(&mdev->rx, mdev->shm + MLINK_RING_B_OFF, false);
+		mlink_ring_attach(&mdev->tx, mdev->shm + MLINK_RING_A_OFF,
+				  MLINK_RING_ENTRIES, MLINK_SLOT_SIZE);
+		mlink_ring_attach(&mdev->rx, mdev->shm + MLINK_RING_B_OFF,
+				  MLINK_RING_ENTRIES, MLINK_SLOT_SIZE);
 	} else {
-		mlink_ring_attach(&mdev->tx, mdev->shm + MLINK_RING_B_OFF, true);
-		mlink_ring_attach(&mdev->rx, mdev->shm + MLINK_RING_A_OFF, false);
+		mlink_ring_attach(&mdev->tx, mdev->shm + MLINK_RING_B_OFF,
+				  MLINK_RING_ENTRIES, MLINK_SLOT_SIZE);
+		mlink_ring_attach(&mdev->rx, mdev->shm + MLINK_RING_A_OFF,
+				  MLINK_RING_ENTRIES, MLINK_SLOT_SIZE);
 	}
 
 	ret = pci_alloc_irq_vectors(pdev, MLINK_NR_VECTORS, MLINK_NR_VECTORS,
@@ -273,6 +290,12 @@ static int mlink_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	ret = mlink_net_init(mdev);
 	if (ret)
 		return dev_err_probe(dev, ret, "cannot register netdev\n");
+	/* Before the link starts: a link (re)start resets the control rings too. */
+	ret = mlink_ctrl_init(mdev);
+	if (ret) {
+		mlink_net_exit(mdev);
+		return dev_err_probe(dev, ret, "cannot register /dev/mlink_ctrl\n");
+	}
 	pci_set_drvdata(pdev, mdev);
 
 	/* The AP owns the layout; the modem starts once it has validated it. */
@@ -313,6 +336,7 @@ static void mlink_remove(struct pci_dev *pdev)
 	WRITE_ONCE(mdev->ready, false);
 	for (i = 0; i < MLINK_NR_VECTORS; i++)
 		devm_free_irq(&pdev->dev, pci_irq_vector(pdev, i), mdev);
+	mlink_ctrl_exit(mdev);	/* open files survive; they get -ENODEV */
 	mlink_net_exit(mdev);
 	dev_info(&pdev->dev, "removed\n");
 }

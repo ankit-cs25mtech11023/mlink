@@ -52,6 +52,8 @@ static void mlink_link_new_gen(struct mlink_dev *mdev)
 	virt_wmb();	/* new gen visible before the zeroed indices */
 	mlink_ring_reset_producer(&mdev->tx);
 	mlink_ring_reset_consumer(&mdev->rx);
+	/* Control rings too; pending requests fail with -ENOTCONN (P7). */
+	mlink_ctrl_link_reset(mdev);
 	mdev->tx_seq = 0;
 	/*
 	 * Both error latches belong to the old incarnation (a stale tx_broken
@@ -139,6 +141,7 @@ static void mlink_link_bring_up(struct mlink_dev *mdev)
 	netif_carrier_on(ndev);
 	if (netif_running(ndev))
 		netif_wake_queue(ndev);
+	mlink_ctrl_link_up(mdev);
 	mlink_kick(mdev, MLINK_VEC_STATE);
 	dev_info(&mdev->pdev->dev, "link UP: peer id=%u gen=%u, own gen=%u (recovery %llu us)\n",
 		 mdev->peer_id, mdev->peer_gen, mdev->gen, mdev->last_recover_us);

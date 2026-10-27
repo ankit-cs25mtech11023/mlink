@@ -22,7 +22,7 @@
 
 #define MLINK_SHM_MAGIC		0x4b4e4c4d	/* "MLNK" in memory order */
 #define MLINK_STATE_MAGIC	0x54534c4d	/* "MLST" */
-#define MLINK_ABI_VERSION	2	/* 2: checksum offload fields in mlink_desc */
+#define MLINK_ABI_VERSION	3	/* 2: csum offload in mlink_desc; 3: control rings */
 
 /* Fixed layout (MVP). */
 #define MLINK_RING_ENTRIES	256		/* power of two */
@@ -32,7 +32,9 @@
 #define MLINK_STATE_MODEM_OFF	0x001040
 #define MLINK_RING_A_OFF	0x002000	/* AP -> MODEM */
 #define MLINK_RING_B_OFF	0x104000	/* MODEM -> AP */
-#define MLINK_LAYOUT_END	0x206000	/* BAR2 must be at least this big */
+#define MLINK_CTRL_C_OFF	0x206000	/* control AP -> MODEM (P7) */
+#define MLINK_CTRL_D_OFF	0x20c000	/* control MODEM -> AP (P7) */
+#define MLINK_LAYOUT_END	0x212000	/* BAR2 must be at least this big */
 
 /* Interrupt vectors: the meaning of a kick on vector N, see design.md §7. */
 enum mlink_vector {
@@ -40,6 +42,7 @@ enum mlink_vector {
 	MLINK_VEC_SPACE,
 	MLINK_VEC_STATE,
 	MLINK_VEC_TEST,
+	MLINK_VEC_CTRL,		/* control ring: new message and/or space freed (P7) */
 	MLINK_NR_VECTORS,
 };
 
@@ -138,6 +141,7 @@ static_assert(offsetof(struct mlink_desc, csum_start) == 12);
 #define MLINK_PROTO_IPV4	0x0800
 #define MLINK_PROTO_IPV6	0x86dd
 #define MLINK_PROTO_TEST	0xfffe	/* ring selftest payload, never reaches the stack */
+#define MLINK_PROTO_CTRL	0xfffd	/* control-plane message (control rings only) */
 
 /* Offsets inside one ring region. */
 #define MLINK_RING_CTRL_OFF	0x0000
@@ -148,7 +152,17 @@ static_assert(sizeof(struct mlink_ring_ctrl) <= MLINK_RING_DESC_OFF);
 static_assert(MLINK_RING_SLOTS_OFF - MLINK_RING_DESC_OFF >=
 	      MLINK_RING_ENTRIES * sizeof(struct mlink_desc));
 static_assert(MLINK_RING_A_OFF + MLINK_RING_SIZE == MLINK_RING_B_OFF);
-static_assert(MLINK_RING_B_OFF + MLINK_RING_SIZE == MLINK_LAYOUT_END);
+static_assert(MLINK_RING_B_OFF + MLINK_RING_SIZE == MLINK_CTRL_C_OFF);
+
+/* Control rings: same structure, small and message-oriented. */
+#define MLINK_CTRL_ENTRIES	16
+#define MLINK_CTRL_SLOT_SIZE	1024
+#define MLINK_CTRL_RING_SIZE	(MLINK_RING_SLOTS_OFF + MLINK_CTRL_ENTRIES * MLINK_CTRL_SLOT_SIZE)
+static_assert((MLINK_CTRL_ENTRIES & (MLINK_CTRL_ENTRIES - 1)) == 0);
+static_assert(MLINK_CTRL_ENTRIES * sizeof(struct mlink_desc) <=
+	      MLINK_RING_SLOTS_OFF - MLINK_RING_DESC_OFF);
+static_assert(MLINK_CTRL_C_OFF + MLINK_CTRL_RING_SIZE == MLINK_CTRL_D_OFF);
+static_assert(MLINK_CTRL_D_OFF + MLINK_CTRL_RING_SIZE == MLINK_LAYOUT_END);
 
 /* Layout sanity: regions are ordered, aligned and fit in 4 MiB. */
 static_assert((MLINK_RING_ENTRIES & (MLINK_RING_ENTRIES - 1)) == 0);

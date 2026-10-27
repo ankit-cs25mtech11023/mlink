@@ -1,0 +1,127 @@
+09:55:23 matrix start kernel=6.18.59-mlink-perf reps=5 secs=10
+09:55:23 host: governors:  8 performance; no_turbo: 1 prep: ON (state saved) 
+09:55:23 temp: 46C
+09:55:35 E1 rep 1: count 10000 lost 0 min_ns 12592 p50_ns 13269 p90_ns 13600 p99_ns 22099 max_ns 232423
+09:55:36 E1 rep 2: count 10000 lost 0 min_ns 12571 p50_ns 13298 p90_ns 13735 p99_ns 23993 max_ns 190734
+09:55:36 E1 rep 3: count 10000 lost 0 min_ns 12451 p50_ns 13254 p90_ns 13509 p99_ns 22900 max_ns 450257
+09:55:36 E1 rep 4: count 10000 lost 0 min_ns 12561 p50_ns 13114 p90_ns 14697 p99_ns 54330 max_ns 373452
+09:55:37 E1 rep 5: count 10000 lost 0 min_ns 12678 p50_ns 13306 p90_ns 13779 p99_ns 23217 max_ns 342465
+09:55:47 E2 mtu=576 tcp fwd rep 1: 4604.9,0
+09:55:57 E2 mtu=576 tcp fwd rep 2: 4711.5,0
+09:56:07 E2 mtu=576 tcp fwd rep 3: 4478.7,0
+09:56:18 E2 mtu=576 tcp fwd rep 4: 4571.8,0
+09:56:28 E2 mtu=576 tcp fwd rep 5: 4623.1,0
+09:56:38 E2 mtu=576 tcp rev rep 1: 4618.9,0
+09:56:48 E2 mtu=576 tcp rev rep 2: 4646.7,0
+09:56:58 E2 mtu=576 tcp rev rep 3: 4620.5,0
+09:57:08 E2 mtu=576 tcp rev rep 4: 4665.7,0
+09:57:19 E2 mtu=576 tcp rev rep 5: 4662.4,0
+09:57:29 E2 mtu=576 udp fwd rep 1: 565.3,0
+09:57:39 E2 mtu=576 udp fwd rep 2: 520.6,0
+09:57:49 E2 mtu=576 udp fwd rep 3: 552.2,0
+09:57:59 E2 mtu=576 udp fwd rep 4: 556.4,0
+09:58:09 E2 mtu=576 udp fwd rep 5: 553.7,0
+09:58:20 E2 mtu=576 udp rev rep 1: 510.9,0
+09:58:30 E2 mtu=576 udp rev rep 2: 507.7,0
+09:58:40 E2 mtu=576 udp rev rep 3: 470.5,0
+09:58:50 E2 mtu=576 udp rev rep 4: 531.8,0
+09:59:00 E2 mtu=576 udp rev rep 5: 490.5,0
+09:59:11 E2 mtu=1500 tcp fwd rep 1: 7758.9,0
+09:59:21 E2 mtu=1500 tcp fwd rep 2: 8376.6,0
+09:59:31 E2 mtu=1500 tcp fwd rep 3: 7453.4,0
+09:59:41 E2 mtu=1500 tcp fwd rep 4: 8155.9,0
+09:59:51 E2 mtu=1500 tcp fwd rep 5: 7337.3,0
+10:00:02 E2 mtu=1500 tcp rev rep 1: 6931.9,7
+10:00:12 E2 mtu=1500 tcp rev rep 2: 7784.8,0
+10:00:22 E2 mtu=1500 tcp rev rep 3: 8012.2,0
+10:00:32 E2 mtu=1500 tcp rev rep 4: 8216.9,0
+10:00:42 E2 mtu=1500 tcp rev rep 5: 8264.3,0
+10:00:52 E2 mtu=1500 udp fwd rep 1: 1456.4,0
+10:01:03 E2 mtu=1500 udp fwd rep 2: 1479.3,0
+10:01:13 E2 mtu=1500 udp fwd rep 3: 1383.8,0
+10:01:23 E2 mtu=1500 udp fwd rep 4: 1620.2,0
+10:01:33 E2 mtu=1500 udp fwd rep 5: 1510.3,0
+10:01:43 E2 mtu=1500 udp rev rep 1: 1375.9,0
+10:01:53 E2 mtu=1500 udp rev rep 2: 1302.8,0
+10:02:04 E2 mtu=1500 udp rev rep 3: 1372.8,0
+10:02:14 E2 mtu=1500 udp rev rep 4: 1278.8,0
+10:02:24 E2 mtu=1500 udp rev rep 5: 1273.0,0
+10:02:34 E2 mtu=4000 tcp fwd rep 1: 11939.1,0
+10:02:45 E2 mtu=4000 tcp fwd rep 2: 11025.0,0
+10:02:55 E2 mtu=4000 tcp fwd rep 3: 11165.8,0
+10:03:05 E2 mtu=4000 tcp fwd rep 4: 10579.8,0
+10:03:15 E2 mtu=4000 tcp fwd rep 5: 11052.1,0
+10:03:25 E2 mtu=4000 tcp rev rep 1: 10975.7,0
+10:03:35 E2 mtu=4000 tcp rev rep 2: 10857.2,0
+10:03:46 E2 mtu=4000 tcp rev rep 3: 11789.2,0
+10:03:56 E2 mtu=4000 tcp rev rep 4: 11018.6,1
+10:04:06 E2 mtu=4000 tcp rev rep 5: 11770.1,0
+10:04:16 E2 mtu=4000 udp fwd rep 1: 3809.2,0
+10:04:26 E2 mtu=4000 udp fwd rep 2: 3399.8,0
+10:04:36 E2 mtu=4000 udp fwd rep 3: 3604.4,0
+10:04:47 E2 mtu=4000 udp fwd rep 4: 3127.8,0
+10:04:57 E2 mtu=4000 udp fwd rep 5: 3292.8,0
+10:05:07 E2 mtu=4000 udp rev rep 1: 3405.6,0
+10:05:17 E2 mtu=4000 udp rev rep 2: 2987.6,0
+10:05:27 E2 mtu=4000 udp rev rep 3: 3184.3,0
+10:05:37 E2 mtu=4000 udp rev rep 4: 3378.7,0
+10:05:48 E2 mtu=4000 udp rev rep 5: 3356.0,0
+10:06:00 E3 weight=8 rep 1: 8077.2,0 polls=921546 exhausted=849662
+10:06:10 E3 weight=8 rep 2: 7705.6,0 polls=880657 exhausted=809335
+10:06:21 E3 weight=8 rep 3: 8170.7,0 polls=932907 exhausted=859551
+10:06:32 E3 weight=8 rep 4: 8151.5,0 polls=930525 exhausted=857264
+10:06:43 E3 weight=8 rep 5: 7817.4,0 polls=893647 exhausted=820628
+10:06:54 E3 weight=16 rep 1: 8179.8,0 polls=470337 exhausted=394732
+10:07:05 E3 weight=16 rep 2: 8235.3,0 polls=475706 exhausted=392537
+10:07:16 E3 weight=16 rep 3: 8218.5,0 polls=472720 exhausted=400995
+10:07:27 E3 weight=16 rep 4: 7196.6,0 polls=421130 exhausted=340528
+10:07:37 E3 weight=16 rep 5: 8217.0,0 polls=469769 exhausted=404320
+10:07:49 E3 weight=32 rep 1: 7980.1,0 polls=238794 exhausted=159953
+10:08:00 E3 weight=32 rep 2: 8118.8,0 polls=241361 exhausted=168427
+10:08:11 E3 weight=32 rep 3: 8378.5,0 polls=247722 exhausted=168643
+10:08:21 E3 weight=32 rep 4: 8339.8,0 polls=248903 exhausted=168597
+10:08:32 E3 weight=32 rep 5: 8268.0,0 polls=247604 exhausted=165765
+10:08:44 E3 weight=64 rep 1: 7625.9,0 polls=152354 exhausted=70068
+10:08:55 E3 weight=64 rep 2: 7814.1,0 polls=154641 exhausted=72646
+10:09:05 E3 weight=64 rep 3: 8418.6,0 polls=160996 exhausted=80714
+10:09:16 E3 weight=64 rep 4: 8311.0,0 polls=158235 exhausted=80564
+10:09:27 E3 weight=64 rep 5: 7702.9,0 polls=154652 exhausted=71057
+10:09:29 E4 loopback_stack_only rep 1: udp_pingpong len=64 n=20000 lost=0 busy_poll=0 min=21.0 p50=27.3 p90=40.6 p99=85.3 p999=206.3 max=724.3 us
+10:09:30 E4 loopback_stack_only rep 2: udp_pingpong len=64 n=20000 lost=0 busy_poll=0 min=17.9 p50=27.1 p90=40.0 p99=84.7 p999=134.0 max=572.0 us
+10:09:30 E4 loopback_stack_only rep 3: udp_pingpong len=64 n=20000 lost=0 busy_poll=0 min=18.1 p50=27.1 p90=39.9 p99=86.7 p999=143.4 max=597.4 us
+10:09:31 E4 loopback_stack_only rep 4: udp_pingpong len=64 n=20000 lost=0 busy_poll=0 min=18.0 p50=27.2 p90=42.3 p99=108.9 p999=264.3 max=823.0 us
+10:09:32 E4 loopback_stack_only rep 5: udp_pingpong len=64 n=20000 lost=0 busy_poll=0 min=21.0 p50=27.1 p90=40.6 p99=89.3 p999=145.9 max=508.3 us
+10:09:33 E4 irq rep 1: udp_pingpong len=64 n=20000 lost=0 busy_poll=0 min=37.7 p50=42.5 p90=59.0 p99=98.8 p999=180.8 max=630.9 us
+10:09:34 E4 irq rep 2: udp_pingpong len=64 n=20000 lost=0 busy_poll=0 min=37.9 p50=44.9 p90=69.3 p99=114.7 p999=251.1 max=1839.8 us
+10:09:35 E4 irq rep 3: udp_pingpong len=64 n=20000 lost=0 busy_poll=0 min=38.0 p50=42.4 p90=60.9 p99=96.8 p999=265.5 max=564.7 us
+10:09:37 E4 irq rep 4: udp_pingpong len=64 n=20000 lost=0 busy_poll=0 min=40.2 p50=44.3 p90=71.1 p99=115.6 p999=288.0 max=1215.4 us
+10:09:38 E4 irq rep 5: udp_pingpong len=64 n=20000 lost=0 busy_poll=0 min=40.2 p50=44.8 p90=75.8 p99=125.8 p999=309.7 max=1624.4 us
+10:09:38 E4 busy_poll_50us rep 1: udp_pingpong len=64 n=20000 lost=0 busy_poll=50 min=12.5 p50=15.4 p90=19.7 p99=31.9 p999=45.7 max=487.5 us
+10:09:39 E4 busy_poll_50us rep 2: udp_pingpong len=64 n=20000 lost=0 busy_poll=50 min=13.0 p50=20.7 p90=26.8 p99=93.3 p999=120.2 max=905.9 us
+10:09:40 E4 busy_poll_50us rep 3: udp_pingpong len=64 n=20000 lost=0 busy_poll=50 min=12.1 p50=15.2 p90=20.1 p99=40.9 p999=102.1 max=495.7 us
+10:09:40 E4 busy_poll_50us rep 4: udp_pingpong len=64 n=20000 lost=0 busy_poll=50 min=12.1 p50=20.9 p90=26.6 p99=93.0 p999=170.9 max=408.0 us
+10:09:41 E4 busy_poll_50us rep 5: udp_pingpong len=64 n=20000 lost=0 busy_poll=50 min=12.6 p50=20.7 p90=26.2 p99=39.9 p999=247.3 max=736.1 us
+10:09:43 E4 no_kick_suppression rep 1: udp_pingpong len=64 n=20000 lost=0 busy_poll=0 min=38.6 p50=44.9 p90=69.7 p99=119.9 p999=264.7 max=1399.7 us
+10:09:44 E4 no_kick_suppression rep 2: udp_pingpong len=64 n=20000 lost=0 busy_poll=0 min=37.6 p50=44.6 p90=74.7 p99=122.7 p999=272.2 max=511.5 us
+10:09:45 E4 no_kick_suppression rep 3: udp_pingpong len=64 n=20000 lost=0 busy_poll=0 min=35.0 p50=42.7 p90=62.1 p99=102.4 p999=164.7 max=531.8 us
+10:09:46 E4 no_kick_suppression rep 4: udp_pingpong len=64 n=20000 lost=0 busy_poll=0 min=39.3 p50=44.7 p90=66.5 p99=111.8 p999=258.2 max=508.2 us
+10:09:47 E4 no_kick_suppression rep 5: udp_pingpong len=64 n=20000 lost=0 busy_poll=0 min=38.3 p50=42.2 p90=64.6 p99=98.7 p999=289.4 max=590.8 us
+10:09:58 E5 offered=10M rep 1: 10.0,0 8946,8940,0.999,1.00,0.6
+10:10:09 E5 offered=10M rep 2: 10.0,0 8945,8937,0.999,1.00,0.7
+10:10:20 E5 offered=10M rep 3: 10.0,0 8945,8938,0.999,1.00,0.9
+10:10:31 E5 offered=50M rep 1: 50.0,0 44664,44622,0.999,1.00,2.2
+10:10:41 E5 offered=50M rep 2: 50.0,0 44661,44617,0.999,1.00,2.1
+10:10:52 E5 offered=50M rep 3: 50.0,0 44663,44604,0.999,1.00,2.1
+10:11:03 E5 offered=100M rep 1: 100.0,0 89310,89118,0.998,1.00,2.6
+10:11:14 E5 offered=100M rep 2: 100.0,0 89310,89126,0.998,1.00,3.7
+10:11:24 E5 offered=100M rep 3: 100.0,0 89306,89180,0.999,1.00,1.6
+10:11:35 E5 offered=200M rep 1: 200.0,0 178606,123085,0.689,1.01,14.2
+10:11:46 E5 offered=200M rep 2: 200.0,0 178605,105081,0.588,1.01,7.9
+10:11:57 E5 offered=200M rep 3: 200.0,0 178600,108436,0.607,1.01,8.5
+10:12:07 E5 offered=0M rep 1: 1185.2,0 1289035,712846,0.553,1.31,47.2
+10:12:18 E5 offered=0M rep 2: 1101.7,0 1164525,758802,0.652,1.34,48.7
+10:12:29 E5 offered=0M rep 3: 1097.5,0 1262105,717633,0.569,1.39,48.2
+10:12:29 temp: 49C
+DMESG GATE: PASS (mlink-ap)
+DMESG GATE: PASS (mlink-modem)
+10:12:29 matrix end

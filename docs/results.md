@@ -147,6 +147,24 @@ optimisations, in order of expected gain: carry checksum-offload state in descri
 (virtio-style `NEEDS_CSUM`/`DATA_VALID`), `NETIF_F_SG`+TSO into larger slots, and fewer kicks
 (already suppressed; batching via `xmit_more`).
 
+## D17 — checksum offload across the link (`bench/results/perf-d17/`)
+
+Same matrix (`ON_HOST=1 OUTDIR=... bash bench/run_matrix.sh 5 10`), same hygiene, after
+advertising `NETIF_F_HW_CSUM | NETIF_F_SG` and carrying `CSUM_PARTIAL` metadata in the
+descriptor (design.md §5.2, plan D17). Medians, Mbit/s:
+
+| TCP | MTU 576 | MTU 1500 | MTU 4000 |
+|---|---|---|---|
+| AP→modem before | 4 374 | 7 202 | 9 932 |
+| AP→modem **after** | 4 605 | **7 759** (+8 %) | **11 052** (+11 %) |
+| modem→AP after | 4 647 | 8 012 | 11 019 |
+
+UDP is unchanged within noise (sender-syscall bound). The new profile (`perf-d17/e7_profile.txt`)
+no longer shows software checksum among the top functions; the slot `memcpy` is now the largest
+single cost (14 % AP / 11 % modem of all samples). Busy-poll UDP p50 measured 20.7 µs in this run
+vs 15.5 µs before — D17 does not touch that path; treated as run-to-run variation (both reported).
+Debug kernel: TCP 47 → ~107 Mbit/s; chaos campaign re-run clean (`p5-chaos-d17-debug.txt`).
+
 ## Correctness evidence (debug kernel)
 
 | test | result | file |

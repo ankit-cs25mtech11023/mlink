@@ -14,7 +14,7 @@ SOCK="$RUN/ivshmem.sock"
 PID="$RUN/ivshmem.pid"
 SHM=mlink-shm
 SIZE=4M
-VECTORS=4
+VECTORS=5	# DATA SPACE STATE TEST CTRL
 
 running() { [ -f "$PID" ] && kill -0 "$(cat "$PID")" 2>/dev/null; }
 

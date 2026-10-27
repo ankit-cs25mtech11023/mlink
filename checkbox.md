@@ -82,7 +82,7 @@
 - [x] P6.8 Write `docs/walkthrough/phase6.md`
 - [ ] P6.9 Study gate 6 passed (results defense)
 - [ ] P6.10 Run full 30-question interview mock grill and update `docs/interview-qa.md`
-- [ ] P6.11 (D17) Checksum offload across the link + SG; re-measure E2/E7 on the perf kernel
+- [x] P6.11 (D17) Checksum offload across the link + SG; re-measure E2/E7 on the perf kernel
 
 ======== MVP CUT LINE (resume freeze) ========
 

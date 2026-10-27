@@ -167,6 +167,7 @@ struct mlink_dev {
 	struct mlink_stats stats;
 	struct mlink_pingpong pp;
 	struct mlink_selftest st;
+	struct mlink_ctrl *ctrl;	/* control plane (mlink_ctrl.c), refcounted */
 	struct dentry *dbg;
 
 	/* Fault injection knobs (debugfs, P5.2); 0 = off. Read in xmit only. */
@@ -214,6 +215,16 @@ void mlink_debugfs_exit(struct mlink_dev *mdev);
 /* mlink_selftest.c: ring consumer + selftest */
 int mlink_rx_poll(struct mlink_dev *mdev, int budget);
 int mlink_selftest_tx(struct mlink_dev *mdev, u32 n);
+
+/* mlink_ctrl.c (P7) */
+struct mlink_ctrl;
+struct seq_file;
+int mlink_ctrl_init(struct mlink_dev *mdev);
+void mlink_ctrl_exit(struct mlink_dev *mdev);
+void mlink_ctrl_irq(struct mlink_dev *mdev);
+void mlink_ctrl_link_reset(struct mlink_dev *mdev);
+void mlink_ctrl_link_up(struct mlink_dev *mdev);
+void mlink_ctrl_stats(struct mlink_dev *mdev, struct seq_file *s);
 
 /* mlink_net.c */
 int mlink_net_init(struct mlink_dev *mdev);

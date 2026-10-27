@@ -21,7 +21,7 @@
 #define MLINK_PP_TIMEOUT_MS	100
 
 static const char * const mlink_vec_names[MLINK_NR_VECTORS] = {
-	"data", "space", "state", "test",
+	"data", "space", "state", "test", "ctrl",
 };
 
 static int info_show(struct seq_file *s, void *unused)
@@ -303,6 +303,7 @@ static int link_show(struct seq_file *s, void *unused)
 	seq_printf(s, "last_recover_us: %llu\n", READ_ONCE(mdev->last_recover_us));
 	seq_printf(s, "last_hb_age_ms:  %u\n", READ_ONCE(mdev->last_hb_age_ms));
 	seq_printf(s, "max_hb_gap_ms:   %u\n", READ_ONCE(mdev->max_hb_gap_ms));
+	mlink_ctrl_stats(mdev, s);
 	return 0;
 }
 DEFINE_SHOW_ATTRIBUTE(link);

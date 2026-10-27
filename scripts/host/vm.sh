@@ -41,7 +41,7 @@ start)
 		-nic "user,model=virtio-net-pci,hostfwd=tcp:127.0.0.1:$SSHPORT-:22" \
 		-virtfs "local,path=$W/share,mount_tag=share,security_model=none,id=share" \
 		-chardev "socket,path=$RUN/ivshmem.sock,id=ivs" \
-		-device ivshmem-doorbell,chardev=ivs,vectors=4 \
+		-device ivshmem-doorbell,chardev=ivs,vectors=5 \
 		-chardev "file,id=ser0,path=$LOGS/$VM-serial.log" -serial chardev:ser0 \
 		-display none -daemonize -pidfile "$PID" -no-reboot \
 		-gdb "tcp:127.0.0.1:$GDBPORT"

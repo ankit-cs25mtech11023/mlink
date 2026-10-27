@@ -15,7 +15,9 @@ struct mlink_ring {
 	struct mlink_ring_ctrl *ctrl;
 	struct mlink_desc *desc;
 	u8 *slots;
+	u32 entries;		/* power of two */
 	u32 mask;		/* entries - 1 */
+	u32 slot_size;
 	u32 idx;		/* local copy of the index this side owns */
 	u32 seen;		/* last peer index read (diagnostics on -EIO) */
 };
@@ -39,7 +41,7 @@ struct mlink_tx_meta {
 	u16 csum_offset;
 };
 
-void mlink_ring_attach(struct mlink_ring *r, void *base, bool producer);
+void mlink_ring_attach(struct mlink_ring *r, void *base, u32 entries, u32 slot_size);
 void mlink_ring_reset_producer(struct mlink_ring *r);
 void mlink_ring_reset_consumer(struct mlink_ring *r);
 
