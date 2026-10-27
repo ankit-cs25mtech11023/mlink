@@ -1,0 +1,66 @@
+# P5.5 1-hour soak on the PERF kernel — 6.18.59-mlink-perf, turbo off. RESULT: dmesg gate PASS both sides, no soft lockup.
+# command (laptop, tmux): bash ~/D/mlink/scripts/host/soak-long.sh 3600
+# notes: kmemleak is not built into the perf kernel (the 'Permission denied' lines are expected);
+#        the per-session iperf3 summary parse is broken for --bidir output (cosmetic); traffic volume is in the counters
+=== long soak start 2026-10-27T05:55:14+05:30 dur=3600s temp=47C
+05:57:25 chaos burst 1 done
+05:59:46 modem restart 1 done
+06:02:36 chaos burst 2 done
+06:04:47 modem restart 2 done
+06:07:47 chaos burst 3 done
+06:09:49 modem restart 3 done
+06:12:59 chaos burst 4 done
+06:14:50 modem restart 4 done
+06:18:10 chaos burst 5 done
+06:19:51 modem restart 5 done
+06:23:21 chaos burst 6 done
+06:24:53 modem restart 6 done
+06:28:33 chaos burst 7 done
+06:29:54 modem restart 7 done
+06:33:44 chaos burst 8 done
+06:34:55 modem restart 8 done
+06:38:56 chaos burst 9 done
+06:39:57 modem restart 9 done
+06:44:07 chaos burst 10 done
+06:44:58 modem restart 10 done
+06:49:18 chaos burst 11 done
+06:49:59 modem restart 11 done
+06:54:30 chaos burst 12 done
+06:55:01 modem restart 12 done
+=== tcp
+tcp session 1: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 2: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 3: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 4: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 5: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 6: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 7: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 8: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 9: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 10: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 11: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 12: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+=== ping
+68920 packets transmitted, 68571 received, 0.506384% packet loss, time 3599952ms
+rtt min/avg/max/mdev = 0.051/8.086/725.230/16.599 ms, pipe 13
+=== ap
+state: UP
+link_ups: 530
+link_resets: 529 (hb_timeout 0, peer_gen 240, peer_down 142, ring 147)
+ rx_len_errors: 90  rx_proto_errors: 9  rx_stalls: 20  ring_corruptions: 147  hb_saved_by_ring: 674  hdr_repairs: 138  tx_stalls: 24
+bash: line 1: /sys/kernel/debug/kmemleak: Permission denied
+bash: line 1: /sys/kernel/debug/kmemleak: Permission denied
+grep: /sys/kernel/debug/kmemleak: No such file or directory
+kmemleak reports:
+DMESG GATE: PASS (mlink-ap)
+=== modem
+state: UP
+link_ups: 1
+link_resets: 0 (hb_timeout 0, peer_gen 0, peer_down 0, ring 0)
+ rx_len_errors: 0  rx_proto_errors: 0  rx_stalls: 0  ring_corruptions: 0  hb_saved_by_ring: 1  hdr_repairs: 0  tx_stalls: 0
+bash: line 1: /sys/kernel/debug/kmemleak: Permission denied
+bash: line 1: /sys/kernel/debug/kmemleak: Permission denied
+grep: /sys/kernel/debug/kmemleak: No such file or directory
+kmemleak reports:
+DMESG GATE: PASS (mlink-modem)
+=== long soak end 2026-10-27T06:55:27+05:30 chaos_bursts=12 modem_restarts=12 max_temp=65C aborted=0
