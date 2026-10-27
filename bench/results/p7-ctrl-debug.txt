@@ -1,0 +1,12 @@
+# P7 control plane functional + SSR + lifetime tests — DEBUG kernel 6.18.59-mlink-debug, 2026-10-27T10:22:25+05:30
+# commands: see docs/walkthrough/phase7.md §6 (mlinkd on modem, mlinkctl on AP)
+## info / stats / data call / bench 2000 (debug kernel)
+ctrl GET_LINK_INFO n=2000 min=477.7 p50=605.5 p90=957.9 p99=1272.6 max=5450.8 us
+data call down -> ping 100% loss, indication received; up -> 0% loss, indication received
+ctrl_tx_msgs 2004 ctrl_rx_msgs 2006 dropped 0 invalid 0
+## SSR (modem daemon+driver restart under a running bench and monitor)
+bench: Transport endpoint is not connected   (no hang)
+monitor: Transport endpoint is not connected
+link_resets 1 (peer_down 1); link UP afterwards; dmesg gate PASS both
+## unbind with /dev/mlink_ctrl open: read/write/ioctl -> ENODEV, close ok, rebind -> UP, dmesg gate (KASAN) PASS
+## O_NONBLOCK read on empty queue -> EAGAIN; blocking read waits (by design)

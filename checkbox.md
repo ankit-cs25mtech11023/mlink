@@ -87,11 +87,11 @@
 ======== MVP CUT LINE (resume freeze) ========
 
 ## Phase 7: (stretch) QMI-like control plane
-- [ ] P7.1 Add control ring pair in reserved shm area (message-oriented, reusing ring code)
-- [ ] P7.2 Define TLV message format (msg_id, txn_id, request/response/indication)
-- [ ] P7.3 Implement `/dev/mlink_ctrl` misc device (write/read/poll/O_NONBLOCK, per-file txn tracking, GET_INFO ioctl)
-- [ ] P7.4 Write `mlinkd` (modem daemon: link info, stats, data-call up/down + indications) and `mlinkctl` CLI
-- [ ] P7.5 Handle SSR in control plane (pending requests fail -ENOTCONN, readers get POLLHUP)
+- [x] P7.1 Add control ring pair in reserved shm area (message-oriented, reusing ring code)
+- [x] P7.2 Define TLV message format (msg_id, txn_id, request/response/indication)
+- [x] P7.3 Implement `/dev/mlink_ctrl` misc device (write/read/poll/O_NONBLOCK, per-file txn tracking, GET_INFO ioctl)
+- [x] P7.4 Write `mlinkd` (modem daemon: link info, stats, data-call up/down + indications) and `mlinkctl` CLI
+- [x] P7.5 Handle SSR in control plane (pending requests fail -ENOTCONN, readers get POLLHUP)
 - [ ] P7.6 Write walkthrough and pass study gate 7
 
 ## Phase 8: (stretch) Zephyr "modem"
