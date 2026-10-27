@@ -1,0 +1,54 @@
+2026-10-27T21:25:01+05:30 start pgid=2502079 hot=88 cool=78 temp=44C: bash /home/ankit-kali/D/mlink/bench/run_ab_e2.sh /home/ankit-kali/D/mlink-work/build/ab/old/driver/mlink.ko /home/ankit-kali/D/mlink-work/build/ab/new/mlink.ko /home/ankit-kali/D/mlink-work/results/ab-e2.csv 5 10
+21:25:16 round 1 build A mtu 576 fwd: 4489.8,0
+21:25:27 round 1 build A mtu 576 rev: 4435.2,0
+21:25:37 round 1 build A mtu 1500 fwd: 7388.1,0
+21:25:48 round 1 build A mtu 4000 fwd: 9831.8,0
+21:25:58 round 1 build A mtu 4000 rev: 11344.2,0
+21:26:14 round 1 build B mtu 576 fwd: 4507.1,0
+21:26:25 round 1 build B mtu 576 rev: 4397.0,0
+21:26:35 round 1 build B mtu 1500 fwd: 7382.1,0
+21:26:46 round 1 build B mtu 4000 fwd: 10545.8,0
+21:26:56 round 1 build B mtu 4000 rev: 10363.1,0
+21:27:12 round 2 build B mtu 576 fwd: 4432.6,0
+21:27:22 round 2 build B mtu 576 rev: 4416.0,0
+21:27:33 round 2 build B mtu 1500 fwd: 6883.1,0
+21:27:43 round 2 build B mtu 4000 fwd: 10004.5,0
+21:27:54 round 2 build B mtu 4000 rev: 10920.2,0
+21:28:10 round 2 build A mtu 576 fwd: 4488.2,0
+21:28:20 round 2 build A mtu 576 rev: 4488.5,0
+21:28:31 round 2 build A mtu 1500 fwd: 7432.5,0
+21:28:41 round 2 build A mtu 4000 fwd: 11461.7,0
+21:28:52 round 2 build A mtu 4000 rev: 10581.5,0
+21:29:07 round 3 build A mtu 576 fwd: 4421.3,0
+21:29:18 round 3 build A mtu 576 rev: 4410.3,0
+21:29:28 round 3 build A mtu 1500 fwd: 6883.8,0
+21:29:39 round 3 build A mtu 4000 fwd: 10752.9,0
+21:29:49 round 3 build A mtu 4000 rev: 11006.3,0
+21:30:05 round 3 build B mtu 576 fwd: 4465.4,0
+21:30:16 round 3 build B mtu 576 rev: 4369.8,0
+21:30:26 round 3 build B mtu 1500 fwd: 7823.6,0
+21:30:37 round 3 build B mtu 4000 fwd: 9876.9,0
+21:30:47 round 3 build B mtu 4000 rev: 11635.5,0
+21:31:03 round 4 build B mtu 576 fwd: 4351.4,0
+21:31:13 round 4 build B mtu 576 rev: 4472.3,0
+21:31:24 round 4 build B mtu 1500 fwd: 7890.1,0
+21:31:34 round 4 build B mtu 4000 fwd: 10422.6,0
+21:31:45 round 4 build B mtu 4000 rev: 10486.4,0
+21:32:01 round 4 build A mtu 576 fwd: 4464.8,0
+21:32:11 round 4 build A mtu 576 rev: 4363.2,0
+21:32:22 round 4 build A mtu 1500 fwd: 8092.4,0
+21:32:32 round 4 build A mtu 4000 fwd: 9911.5,0
+21:32:43 round 4 build A mtu 4000 rev: 10224.6,0
+21:32:59 round 5 build A mtu 576 fwd: 4464.5,0
+21:33:09 round 5 build A mtu 576 rev: 4487.4,0
+21:33:19 round 5 build A mtu 1500 fwd: 7873.0,0
+21:33:30 round 5 build A mtu 4000 fwd: 11105.4,0
+21:33:40 round 5 build A mtu 4000 rev: 10759.5,0
+21:33:56 round 5 build B mtu 576 fwd: 4340.0,0
+21:34:07 round 5 build B mtu 576 rev: 4454.8,0
+21:34:17 round 5 build B mtu 1500 fwd: 6852.4,0
+21:34:28 round 5 build B mtu 4000 fwd: 10187.2,0
+21:34:38 round 5 build B mtu 4000 rev: 10356.6,0
+A/B done
+2026-10-27T21:34:39+05:30 end rc=0, frozen for 0s total, temp=54C
+EXIT=0

@@ -165,6 +165,28 @@ single cost (14 % AP / 11 % modem of all samples). Busy-poll UDP p50 measured 20
 vs 15.5 µs before — D17 does not touch that path; treated as run-to-run variation (both reported).
 Debug kernel: TCP 47 → ~107 Mbit/s; chaos campaign re-run clean (`p5-chaos-d17-debug.txt`).
 
+## Re-measurement after the KCSAN fixes (`bench/results/perf-r2/`)
+
+P5.4 changed the driver after the headline run (marked accesses on the ring's local index,
+`u64_stats_t` counters). Same method, perf kernel, CPU fixed by bench-prep:
+
+- Full matrix re-run (`ON_HOST=1 OUTDIR=... bash bench/run_matrix.sh 5 10`): TCP medians 2–6 %
+  below the D17 run (MTU 1500 fwd 7.54 vs 7.76 Gbit/s, MTU 4000 fwd 10.75 vs 11.05).
+- To separate code from day-to-day drift, an interleaved A/B on one boot, old driver
+  (`b53a2d8^`) vs new, order flipped each round, 5 rounds × 10 s
+  (`bash bench/run_ab_e2.sh old.ko new.ko ab-e2.csv 5 10`, `perf-r2/ab-e2.csv`):
+
+| TCP | A old (median [min..max]) | B new | Δ |
+|---|---|---|---|
+| MTU 576 fwd / rev | 4465 [4421..4490] / 4435 [4363..4488] | 4433 [4340..4507] / 4416 [4370..4472] | −0.7 / −0.4 % |
+| MTU 1500 fwd | 7433 [6884..8092] | 7382 [6852..7890] | −0.7 % |
+| MTU 4000 fwd / rev | 10753 [9832..11462] / 10760 [10225..11344] | 10187 [9877..10546] / 10486 [10357..11636] | −5.3 / −2.5 % |
+
+All ranges overlap; the old driver itself measured lower than on the D17 day (576 fwd 4465 vs
+4605), so most of the re-run's drop is run-to-run/day-to-day variation, not the fixes. A small
+cost at MTU 4000 cannot be excluded with n = 5. The headline numbers stay those of the D17 run;
+today's figures are the conservative ones.
+
 ## P8 — Zephyr modem interop (`bench/results/p8-zephyr-modem.txt`)
 
 The Linux modem replaced by a Zephyr v4.4.2 loopback modem (`zephyr/mlink-modem`, 276 KB RAM)

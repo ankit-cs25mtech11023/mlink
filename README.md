@@ -40,6 +40,10 @@ numbers measured on a perf kernel. Full methodology and caveats: [`docs/results.
 | Peer VM killed | detected **520 ms** after its last heartbeat; re-handshake with the new peer ID |
 | Shared-memory corruption (1 201 ops, 7 modes) | no crash, KASAN clean, recovery ≤ 3.2 s |
 
+Re-measured after the KCSAN race fixes (P5.4): a same-boot A/B of old vs new driver is within
+run-to-run noise (−0.4 … −0.7 % at MTU 576/1500, ranges overlapping at 4000); a later full re-run
+gave 7.5 / 10.8 Gbit/s at MTU 1500 / 4000. Details: [`docs/results.md`](docs/results.md).
+
 ![throughput vs MTU](docs/img/e2_mtu_perf.png)
 ![latency](docs/img/e4_latency_perf.png)
 
