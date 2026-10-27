@@ -686,10 +686,16 @@ Every phase ends with: walkthrough doc → study gate → commit (+ push once re
   checkpatch-clean cleanup in a subsystem you touched); follow
   `Documentation/process/submitting-patches.rst`, `get_maintainer.pl`, `git send-email`
   (needs SMTP setup by the user). Start early — review takes weeks.
+  **Chosen (D22):** QEMU `contrib/ivshmem-client` busy-loops at 100 % CPU after stdin EOF
+  (`read()` == 0 is treated as a command; found in P8.1 as 6.8 MB of `cmd>` output). Still in
+  QEMU master (file unchanged since 2019), no existing issue/patch found. Patch against QEMU
+  master, QEMU `scripts/checkpatch.pl` + `get_maintainer.pl`, reproduced before/after, sent to
+  qemu-devel from cs25mtech11023@iith.ac.in after the user confirms the final text.
 
 ### Phase 11 — (stretch) Real hardware
 - P11.1 ₹500 Raspberry Pi Pico 2 as a USB "modem" (TinyUSB vendor class), Linux USB driver
   (`usb_driver`, URBs, bulk endpoints) exposing the same `mlink0` semantics.
+  **Descoped (D22): no hardware available.**
 
 ---
 
@@ -806,6 +812,13 @@ For each phase N:
   checksum) and swaps UDP addresses + ports (a CHECKSUM_PARTIAL pseudo-header sum is
   symmetric under the swap, so desc flags/csum fields are reflected as-is); anything else is
   dropped and counted. Control rings (P7) are not served by Zephyr (AP requests time out).
+- **D22 (2026-10-27)** User: no hardware → **P11 descoped**. Finish everything that is not the
+  user's reading (study gates, design review, resume approval, grill stay with the user).
+  P10 = QEMU ivshmem-client stdin-EOF busy-loop fix, from cs25mtech11023@iith.ac.in (the
+  GitHub email); the final send waits for the user's confirmation of the exact patch, their
+  real name for Signed-off-by, and SMTP credentials they store themselves (never seen by
+  Claude, like D13). P0.7 ticked: the debug build's config check passed ("all 81 requested
+  options present", `logs/build-debug.log`) and that kernel has been in use since P0.9.
 - **D20 (2026-10-27)** P8.3 design: build-time Kconfig `MLINK_MODEM_NET` (loopback stays the
   default). Zephyr net driver = `DUMMY_L2` interface (no link header; the net core picks
   IPv4/IPv6 from the version nibble, as `mhi_net` relies on `ARPHRD_RAWIP`). RX: the poll

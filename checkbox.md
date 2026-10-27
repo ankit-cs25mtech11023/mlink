@@ -11,7 +11,7 @@
 - [x] P0.4b User writes `~/D/mlink-work/.secrets/sudo.pass` (0600); `msudo.sh true` works and logs to `logs/sudo.log` without exposing the password
 - [x] P0.5 Fetch kernel LTS source (shallow) and QEMU 10.2.2 tarball; record exact kernel tag in plan.md Key Decisions
 - [x] P0.6 Build `ivshmem-server` from QEMU source (or fallback: write `ivshmem-lite-server.c`) and verify socket + `/dev/shm/mlink-shm`
-- [ ] P0.7 Write kernel config fragments and build the debug kernel (KASAN, lockdep, BTF) in tmux; verify options landed in `.config`
+- [x] P0.7 Write kernel config fragments and build the debug kernel (KASAN, lockdep, BTF) in tmux; verify options landed in `.config`
 - [x] P0.8 Build Debian trixie rootfs with mmdebstrap (ssh keys, 9p fstab, networkd for virtio NIC) and create ap/modem qcow2 overlays
 - [x] P0.9 Boot both VMs via `ivshmem.sh` + `vm.sh`; ssh from Windows via aliases; ivshmem 1af4:1110 visible in both; /mnt/share mounted
 - [x] P0.10 Hello-module loop working (rbuild.sh sync→build→stage, insmod/rmmod in guest), plus dmesg-gate.sh and test.sh skeleton
@@ -104,7 +104,7 @@
 - [x] P9.2 Build and run driver on arm64 as the modem of the x86 AP (selftest + ping + SSR) and write weak-memory discussion
 
 ## Phase 10: (stretch) Upstream contribution
-- [ ] P10.1 Prepare and send one small upstream patch (submitting-patches flow, get_maintainer, send-email)
+- [ ] P10.1 Prepare and send one small upstream patch (submitting-patches flow, get_maintainer, send-email) — D22: QEMU ivshmem-client stdin-EOF busy loop
 
 ## Phase 11: (stretch) Real hardware
-- [ ] P11.1 Pi Pico 2 USB "modem" + Linux USB driver exposing mlink0 semantics
+- [ ] ~~P11.1 Pi Pico 2 USB "modem" + Linux USB driver exposing mlink0 semantics~~ — descoped (D22: no hardware)
