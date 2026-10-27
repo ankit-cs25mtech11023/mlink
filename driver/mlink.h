@@ -100,11 +100,15 @@ struct mlink_selftest {
 	u64 rx_first_ns, rx_last_ns;
 };
 
-/* netdev packet counters; one writer context each, read under syncp. */
+/*
+ * netdev packet counters; one writer context each, read under syncp.
+ * u64_stats_t, not u64: on 64-bit syncp is empty, so the counters themselves
+ * must use marked accesses for the lockless ndo_get_stats64 reader (KCSAN).
+ */
 struct mlink_netstats {
-	u64 packets;
-	u64 bytes;
-	u64 dropped;
+	u64_stats_t packets;
+	u64_stats_t bytes;
+	u64_stats_t dropped;
 	struct u64_stats_sync syncp;
 };
 
@@ -190,7 +194,11 @@ extern const unsigned int mlink_nr_stats;
 
 static inline u64 mlink_stat_read(struct mlink_dev *mdev, unsigned int i)
 {
-	return READ_ONCE(*(u64 *)((u8 *)&mdev->stats + mlink_stat_descs[i].off));
+	/*
+	 * Diagnostic counters: plain ++ by their own context, read here
+	 * locklessly (ethtool -S, debugfs); a stale value is fine.
+	 */
+	return data_race(*(u64 *)((u8 *)&mdev->stats + mlink_stat_descs[i].off));
 }
 
 void mlink_kick(struct mlink_dev *mdev, enum mlink_vector vec);

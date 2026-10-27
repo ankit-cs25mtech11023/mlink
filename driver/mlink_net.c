@@ -27,7 +27,7 @@ static struct mlink_dev *ndev_to_mdev(struct net_device *ndev)
 static void mlink_tx_drop(struct mlink_dev *mdev, struct sk_buff *skb)
 {
 	u64_stats_update_begin(&mdev->tx_stats.syncp);
-	mdev->tx_stats.dropped++;
+	u64_stats_inc(&mdev->tx_stats.dropped);
 	u64_stats_update_end(&mdev->tx_stats.syncp);
 	dev_kfree_skb_any(skb);
 }
@@ -133,8 +133,8 @@ static netdev_tx_t mlink_start_xmit(struct sk_buff *skb, struct net_device *ndev
 	mlink_ring_publish(r, mlink_fault_len(mdev, len), &meta, mdev->tx_seq++);
 
 	u64_stats_update_begin(&mdev->tx_stats.syncp);
-	mdev->tx_stats.packets++;
-	mdev->tx_stats.bytes += len;
+	u64_stats_inc(&mdev->tx_stats.packets);
+	u64_stats_add(&mdev->tx_stats.bytes, len);
 	u64_stats_update_end(&mdev->tx_stats.syncp);
 	dev_consume_skb_any(skb);
 
@@ -221,15 +221,15 @@ void mlink_net_rx(struct mlink_dev *mdev, const struct mlink_rx_desc *d)
 	}
 
 	u64_stats_update_begin(&mdev->rx_stats.syncp);
-	mdev->rx_stats.packets++;
-	mdev->rx_stats.bytes += d->len;
+	u64_stats_inc(&mdev->rx_stats.packets);
+	u64_stats_add(&mdev->rx_stats.bytes, d->len);
 	u64_stats_update_end(&mdev->rx_stats.syncp);
 	napi_gro_receive(&mdev->napi, skb);
 	return;
 
 drop:
 	u64_stats_update_begin(&mdev->rx_stats.syncp);
-	mdev->rx_stats.dropped++;
+	u64_stats_inc(&mdev->rx_stats.dropped);
 	u64_stats_update_end(&mdev->rx_stats.syncp);
 }
 
@@ -292,16 +292,16 @@ static void mlink_get_stats64(struct net_device *ndev,
 
 	do {
 		start = u64_stats_fetch_begin(&mdev->rx_stats.syncp);
-		s->rx_packets = mdev->rx_stats.packets;
-		s->rx_bytes = mdev->rx_stats.bytes;
-		s->rx_dropped = mdev->rx_stats.dropped;
+		s->rx_packets = u64_stats_read(&mdev->rx_stats.packets);
+		s->rx_bytes = u64_stats_read(&mdev->rx_stats.bytes);
+		s->rx_dropped = u64_stats_read(&mdev->rx_stats.dropped);
 	} while (u64_stats_fetch_retry(&mdev->rx_stats.syncp, start));
 
 	do {
 		start = u64_stats_fetch_begin(&mdev->tx_stats.syncp);
-		s->tx_packets = mdev->tx_stats.packets;
-		s->tx_bytes = mdev->tx_stats.bytes;
-		s->tx_dropped = mdev->tx_stats.dropped;
+		s->tx_packets = u64_stats_read(&mdev->tx_stats.packets);
+		s->tx_bytes = u64_stats_read(&mdev->tx_stats.bytes);
+		s->tx_dropped = u64_stats_read(&mdev->tx_stats.dropped);
 	} while (u64_stats_fetch_retry(&mdev->tx_stats.syncp, start));
 
 	s->rx_errors = READ_ONCE(mdev->stats.rx_len_errors) +
