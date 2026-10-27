@@ -1,0 +1,34 @@
+# P10 (D22): QEMU contrib/ivshmem-client stdin-EOF busy loop — 2026-10-27, laptop
+# Found in P8.1: `(...) | ivshmem-client` produced 6.8 MB of "cmd> " after the pipe closed.
+# Upstream check: contrib/ivshmem-client/main.c in QEMU master (shallow clone, top commit
+# d731492 "Merge tag 'samuel-thibault' ...") is byte-identical to the GPG-verified 10.2.2 tree;
+# last change to the file 2019-06-12; no GitLab issue (search "ivshmem-client": 3 unrelated)
+# and no qemu-devel patch found. No MAINTAINERS entry for contrib/ivshmem-* or hw/misc/ivshmem-pci.
+# All builds/runs below use the verified 10.2.2 tree with the patch applied (identical file).
+# Commands: bash ~/D/mlink/scripts/host/p10-ivshmem-client.sh repro|patch|build|functest
+
+## Before (10.2.2 unmodified = master behaviour), stdin </dev/null, 3 s
+client: 10.2.2 unmodified
+exit=124 (124 = still running when timeout killed it)
+elapsed=3.009s user=1.387s sys=1.617s
+stdout bytes=1913193 prompts=382597
+
+## After (patch applied)
+client: 10.2.2 + patch
+exit=124 (124 = still running when timeout killed it)     <- intended: keeps serving the server
+elapsed=3.005s user=0.005s sys=0.001s
+stdout bytes=187 prompts=1
+
+## Functional: piped commands still work; a client at stdin EOF still gets doorbells
+client B1 (piped dump): our_id 50, peers listed: 3 -> client A (stdin at EOF) is peer 49
+client A notifications:
+receive notification from peer_id=49 vector=0
+receive notification from peer_id=49 vector=3
+
+## Style: QEMU scripts/checkpatch.pl (from the 10.2.2 tree)
+total: 0 errors, 0 warnings, 59 lines checked
+
+## Recipients (no MAINTAINERS entry): To qemu-devel@nongnu.org, Cc qemu-trivial@nongnu.org
+## git send-email --dry-run: Dry-OK (nothing sent)
+## Patch: upstream/qemu-ivshmem-client-eof/0001-contrib-ivshmem-client-stop-polling-stdin-after-EOF.patch
+## NOT SENT YET: needs the user's full name for Signed-off-by and their go-ahead.

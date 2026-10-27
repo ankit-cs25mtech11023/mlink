@@ -1,0 +1,93 @@
+From 35f6d48543c14242d92a9221030941c77662b89a Mon Sep 17 00:00:00 2001
+From: "Ankit (FULL NAME TBD)" <cs25mtech11023@iith.ac.in>
+Date: Tue, 27 Oct 2026 17:18:57 +0530
+Subject: [PATCH] contrib/ivshmem-client: stop polling stdin after EOF
+
+When stdin reaches end-of-file (Ctrl-D, a closed pipe, or running the
+client with </dev/null), read() returns 0, which
+ivshmem_client_handle_stdin_command() treats as an empty command line:
+it prints a new prompt and returns success. select() keeps reporting
+stdin as readable, so the client spins at 100% CPU printing "cmd> "
+until it is killed. With stdin at EOF for 3 seconds it printed 382597
+prompts (1.9 MB) and used 3 s of CPU.
+
+Return 1 on EOF and stop adding stdin to the select() set. The client
+keeps handling server and peer events, so it still works as a
+non-interactive notification logger, without busy-looping (same 3 s
+test: one prompt, 5 ms of CPU, doorbells still received).
+
+Signed-off-by: Ankit (FULL NAME TBD) <cs25mtech11023@iith.ac.in>
+---
+ contrib/ivshmem-client/main.c | 31 ++++++++++++++++++++++++-------
+ 1 file changed, 24 insertions(+), 7 deletions(-)
+
+diff --git a/contrib/ivshmem-client/main.c b/contrib/ivshmem-client/main.c
+index 21f38f3..bdc14b3 100644
+--- a/contrib/ivshmem-client/main.c
++++ b/contrib/ivshmem-client/main.c
+@@ -73,7 +73,7 @@ ivshmem_client_cmdline_help(void)
+            "int all: notify all vectors of all peers (excepting us)\n");
+ }
+ 
+-/* read stdin and handle commands */
++/* read stdin and handle commands; return 1 on EOF, -1 on error, else 0 */
+ static int
+ ivshmem_client_handle_stdin_command(IvshmemClient *client)
+ {
+@@ -88,6 +88,9 @@ ivshmem_client_handle_stdin_command(IvshmemClient *client)
+     if (ret < 0) {
+         return -1;
+     }
++    if (ret == 0) {
++        return 1;
++    }
+ 
+     s = buf;
+     while ((token = strsep(&s, "\n\r;")) != NULL) {
+@@ -134,12 +137,16 @@ ivshmem_client_poll_events(IvshmemClient *client)
+ {
+     fd_set fds;
+     int ret, maxfd;
++    bool stdin_eof = false;
+ 
+     while (1) {
+ 
+         FD_ZERO(&fds);
+-        FD_SET(0, &fds); /* add stdin in fd_set */
+-        maxfd = 1;
++        maxfd = 0;
++        if (!stdin_eof) {
++            FD_SET(0, &fds); /* add stdin in fd_set */
++            maxfd = 1;
++        }
+ 
+         ivshmem_client_get_fds(client, &fds, &maxfd);
+ 
+@@ -156,10 +163,20 @@ ivshmem_client_poll_events(IvshmemClient *client)
+             continue;
+         }
+ 
+-        if (FD_ISSET(0, &fds) &&
+-            ivshmem_client_handle_stdin_command(client) < 0 && errno != EINTR) {
+-            fprintf(stderr, "ivshmem_client_handle_stdin_command() failed\n");
+-            break;
++        if (FD_ISSET(0, &fds)) {
++            int cmd_ret = ivshmem_client_handle_stdin_command(client);
++
++            if (cmd_ret > 0) {
++                /*
++                 * EOF: stdin stays readable forever, so stop polling it
++                 * (or select() spins) but keep serving the server.
++                 */
++                stdin_eof = true;
++            } else if (cmd_ret < 0 && errno != EINTR) {
++                fprintf(stderr,
++                        "ivshmem_client_handle_stdin_command() failed\n");
++                break;
++            }
+         }
+ 
+         if (ivshmem_client_handle_fds(client, &fds, maxfd) < 0) {
+-- 
+2.53.0
+
