@@ -75,7 +75,7 @@
 - [x] P6.1 Build perf kernel (no debug options), boot VMs on it, rebuild module against it
 - [x] P6.2 Write bench-prep/restore (stop background apps, governor via NOPASSWD script, CPU pinning, repetitions) and restore afterwards
 - [x] P6.3 Write `tools/udp_pingpong.c` latency tool (histogram percentiles, CSV, optional SO_BUSY_POLL)
-- [ ] P6.4 Run experiment matrix (doorbell RTT, throughput vs MTU/NAPI weight, latency modes, IRQs/packet vs load, SSR times, profile breakdown)
+- [x] P6.4 Run experiment matrix (doorbell RTT, throughput vs MTU/NAPI weight, latency modes, IRQs/packet vs load, SSR times, profile breakdown)
 - [x] P6.5 Create Windows `.venv` + pinned `bench/requirements.txt`, write `bench/plot.py`, and generate plots into docs/img
 - [x] P6.6 Write `docs/results.md` (methodology + caveats) and full README (diagram, how to run, results, prior art, limitations)
 - [ ] P6.7 Fill the resume bullet from measured numbers and get user approval

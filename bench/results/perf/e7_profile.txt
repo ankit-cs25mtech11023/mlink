@@ -1,0 +1,44 @@
+# E7 kernel profile, 6.18.59-mlink-perf, 2026-10-27T06:55:50+05:30, TCP AP->modem MTU 1500, 8s @ 499 Hz/CPU
+# iperf3: 7335 Mbits/sec
+## ap (top 20 kernel functions, % of samples)
+ 46.08%  pv_native_safe_halt
+  9.52%  memcpy_orig
+  5.21%  csum_partial_copy_generic
+  3.73%  rep_movs_alternative
+  3.08%  iowrite32
+  2.85%  __slab_free
+  2.21%  handle_softirqs
+  2.00%  tcp_wfree
+  1.72%  __alloc_skb
+  1.68%  skb_segment
+  1.35%  __kmalloc_node_track_caller_noprof
+  1.16%  skb_copy_and_csum_bits
+  1.16%  kmem_cache_alloc_node_noprof
+  0.89%  ___slab_alloc
+  0.87%  mlink_start_xmit
+  0.80%  kfree
+  0.65%  ip_send_check
+  0.62%  tcp_gso_segment
+  0.58%  _raw_spin_unlock_irqrestore
+  0.54%  mlink_ring_publish
+## modem (top 20 kernel functions, % of samples)
+ 51.68%  pv_native_safe_halt
+  9.03%  memcpy_orig
+  5.29%  rep_movs_alternative
+  3.25%  iowrite32
+  3.07%  csum_partial
+  2.37%  _raw_spin_unlock_irqrestore
+  1.58%  dev_gro_receive
+  1.47%  napi_alloc_skb
+  1.41%  handle_softirqs
+  1.36%  inet_gro_receive
+  1.26%  tcp_gro_receive
+  1.24%  skb_gro_receive
+  1.14%  finish_task_switch.isra.0
+  0.97%  mlink_ring_peek
+  0.92%  _copy_to_iter
+  0.78%  __skb_datagram_iter
+  0.77%  tcp4_gro_receive
+  0.57%  mlink_net_rx
+  0.48%  mlink_rx_poll
+  0.44%  skb_release_data

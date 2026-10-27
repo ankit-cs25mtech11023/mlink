@@ -125,6 +125,28 @@ Perf kernel, turbo on (default), VMs unpinned, live TCP iperf3 + 10 ms ping from
 Debug-kernel SSR evidence (100/100 consecutive restarts, reasons per reset):
 `bench/results/p4-ssr-debug.txt`.
 
+## E7 — Where the time goes (`e7_profile.txt`)
+
+`bench/run_profile.sh 8`: bpftrace samples kernel IPs at 499 Hz on every vCPU of both guests
+during a 7.3 Gbit/s TCP run (MTU 1500). ~50 % of samples are idle (one of each guest's two
+vCPUs carries the flow). Share of **all** samples:
+
+| cost | AP (sender) | modem (receiver) |
+|---|---|---|
+| mlink slot copy (`memcpy_orig`, `skb_copy_bits` / `skb_put_data`) | 9.5 % | 9.0 % |
+| user ↔ kernel copy (`rep_movs_alternative`) | 3.7 % | 5.3 % |
+| software checksum (`csum_partial_copy_generic`, `csum_partial`, …) | 6.4 % | 3.1 % |
+| software segmentation (`skb_segment`, `tcp_gso_segment`) | 2.3 % | — |
+| doorbell MMIO = VM exit (`iowrite32`) | 3.1 % | 3.3 % |
+| GRO (`*_gro_receive`) | — | ~5 % |
+| mlink's own logic (xmit, publish, peek, rx) | ~1.4 % | ~2 % |
+
+The ring protocol itself is cheap; the cost is in **copies, software checksum and software
+segmentation** (mlink0 advertises no offloads) and in **doorbell VM exits**. Next
+optimisations, in order of expected gain: carry checksum-offload state in descriptor flags
+(virtio-style `NEEDS_CSUM`/`DATA_VALID`), `NETIF_F_SG`+TSO into larger slots, and fewer kicks
+(already suppressed; batching via `xmit_more`).
+
 ## Correctness evidence (debug kernel)
 
 | test | result | file |
@@ -135,7 +157,8 @@ Debug-kernel SSR evidence (100/100 consecutive restarts, reasons per reset):
 | shm_chaos, 1 201 corruptions × 7 modes | no crash, KASAN clean, recover ≤ 3.2 s | `p5-chaos-debug.txt` |
 | fault knobs (dropped/delayed kicks, bad lengths) | absorbed, counted, self-healing | `p5-faults-debug.txt` |
 | static analysis | checkpatch --strict / sparse / W=1 clean | `p5-static-analysis.txt` |
-| 1-hour soak (TCP + chaos + restarts) | AP clean; **modem soft lockup under investigation** | `p5-soak-long-debug.txt` |
+| 1-hour soak (TCP + 12 chaos bursts + 12 restarts), debug kernel | AP clean; modem: one 22 s soft lockup inside KASAN/kmemleak stack saving (no mlink frames) — open | `p5-soak-long-debug.txt` |
+| same 1-hour soak, **perf kernel** | dmesg gate clean on both, no lockup | `perf/p5-soak-long-perf.txt` |
 
 ## Caveats
 
