@@ -186,6 +186,7 @@ int mlink_selftest_tx(struct mlink_dev *mdev, u32 n)
 {
 	struct mlink_selftest *st = &mdev->st;
 	struct mlink_ring *r = &mdev->tx;
+	const struct mlink_tx_meta meta = { .proto = MLINK_PROTO_TEST };
 	u64 t0, kicks = 0, supp = 0;
 	u32 seq;
 	int ret = 0;
@@ -212,7 +213,7 @@ int mlink_selftest_tx(struct mlink_dev *mdev, u32 n)
 		if (ret)
 			break;
 		st_fill(mlink_ring_slot(r), len, seq);
-		mlink_ring_publish(r, len, MLINK_PROTO_TEST, seq);
+		mlink_ring_publish(r, len, &meta, seq);
 		if (!kick_suppress || mlink_ring_need_kick(r, !unsafe_no_mb)) {
 			mlink_kick(mdev, MLINK_VEC_DATA);
 			kicks++;

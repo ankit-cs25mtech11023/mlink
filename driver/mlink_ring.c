@@ -64,14 +64,16 @@ void *mlink_ring_slot(struct mlink_ring *r)
 }
 
 /* Caller has filled mlink_ring_slot() and checked mlink_ring_free() > 0. */
-void mlink_ring_publish(struct mlink_ring *r, u32 len, u16 proto, u32 seq)
+void mlink_ring_publish(struct mlink_ring *r, u32 len, const struct mlink_tx_meta *m, u32 seq)
 {
 	struct mlink_desc *d = &r->desc[r->idx & r->mask];
 
 	WRITE_ONCE(d->len, len);
-	WRITE_ONCE(d->proto, proto);
-	WRITE_ONCE(d->flags, 0);
+	WRITE_ONCE(d->proto, m->proto);
+	WRITE_ONCE(d->flags, m->flags);
 	WRITE_ONCE(d->seq, seq);
+	WRITE_ONCE(d->csum_start, m->csum_start);
+	WRITE_ONCE(d->csum_offset, m->csum_offset);
 	r->idx++;
 	/* Release: payload and descriptor become visible no later than prod. */
 	virt_store_release(&r->ctrl->prod.val, r->idx);
@@ -125,7 +127,10 @@ int mlink_ring_peek(struct mlink_ring *r, struct mlink_rx_desc *d)
 	/* Fetch each peer-written field once; only the local copies are trusted. */
 	d->len = READ_ONCE(sd->len);
 	d->proto = READ_ONCE(sd->proto);
+	d->flags = READ_ONCE(sd->flags);
 	d->seq = READ_ONCE(sd->seq);
+	d->csum_start = READ_ONCE(sd->csum_start);
+	d->csum_offset = READ_ONCE(sd->csum_offset);
 	d->data = r->slots + (size_t)(r->idx & r->mask) * MLINK_SLOT_SIZE;
 	if (unlikely(!d->len || d->len > MLINK_SLOT_SIZE))
 		return -EMSGSIZE;
@@ -165,7 +170,6 @@ void mlink_ring_disarm_kick(struct mlink_ring *r)
 {
 	WRITE_ONCE(r->ctrl->want_kick.val, 0);
 }
-
 
 u32 mlink_ring_pending(struct mlink_ring *r)
 {

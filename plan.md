@@ -763,6 +763,11 @@ For each phase N:
   the core logs an error); ring-size sweep deferred until the layout is configurable. Benchmarks
   run with turbo OFF (fixed 1.6 GHz) for thermal safety and low variance — absolute numbers are
   therefore conservative; stated in results.md.
+- **D17 (2026-10-27)** Post-MVP optimisation driven by the E7 profile (software checksum + copies
+  dominate): carry checksum-offload state across the link in the descriptor (virtio-style:
+  `flags` bit `CSUM_PARTIAL` + `csum_start`/`csum_offset` in the former `rsvd` word), advertise
+  `NETIF_F_HW_CSUM | NETIF_F_SG`. ABI version 1 → 2. Receiver validates start/offset from shm
+  before `skb_partial_csum_set()`. Measured before/after with the same matrix commands.
 - **D14 (2026-10-27)** Guest kernel = **v6.18.59** (latest 6.18 longterm per kernel.org
   releases.json on 2026-10-27; 7.2.13 stable / 7.3 mainline not chosen — LTS for stable APIs).
   QEMU source 10.2.2, GPG signature verified (key CEACC9E15534EBABB82D3FA03353C9CEF108B584),

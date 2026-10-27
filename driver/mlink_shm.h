@@ -16,18 +16,13 @@
 #include <linux/stddef.h>
 #include <linux/types.h>
 #else
-/* Userspace (tools/shm_chaos.c) shares this ABI header. */
+/* Userspace (tools/shm_chaos.c) supplies u16/u32/static_assert/__aligned. */
 #include <stddef.h>
-#include <stdint.h>
-typedef uint16_t u16;
-typedef uint32_t u32;
-#define static_assert _Static_assert
-#define __aligned(x) __attribute__((aligned(x)))
 #endif
 
 #define MLINK_SHM_MAGIC		0x4b4e4c4d	/* "MLNK" in memory order */
 #define MLINK_STATE_MAGIC	0x54534c4d	/* "MLST" */
-#define MLINK_ABI_VERSION	1
+#define MLINK_ABI_VERSION	2	/* 2: checksum offload fields in mlink_desc */
 
 /* Fixed layout (MVP). */
 #define MLINK_RING_ENTRIES	256		/* power of two */
@@ -124,12 +119,21 @@ static_assert(offsetof(struct mlink_ring_ctrl, want_kick) == 192);
 struct mlink_desc {
 	u32 len;		/* payload bytes in the slot, 1..slot_size */
 	u16 proto;		/* MLINK_PROTO_* */
-	u16 flags;
+	u16 flags;		/* MLINK_DESC_F_* */
 	u32 seq;		/* producer sequence number (selftest, debugging) */
-	u32 rsvd;
+	u16 csum_start;		/* CSUM_PARTIAL: checksum covers [csum_start, len) */
+	u16 csum_offset;	/* CSUM_PARTIAL: where to store it, from csum_start */
 };
 
+/*
+ * The packet's L4 checksum is not filled in (sender had CHECKSUM_PARTIAL);
+ * the receiver passes it on as CHECKSUM_PARTIAL. Over shared memory there is
+ * no wire to corrupt bits, so computing it would be wasted work.
+ */
+#define MLINK_DESC_F_CSUM_PARTIAL	0x0001
+
 static_assert(sizeof(struct mlink_desc) == 16);
+static_assert(offsetof(struct mlink_desc, csum_start) == 12);
 
 #define MLINK_PROTO_IPV4	0x0800
 #define MLINK_PROTO_IPV6	0x86dd

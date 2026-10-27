@@ -83,6 +83,7 @@ struct mlink_stats {
 	u64 fault_kicks_dropped;	/* P5.2 injected */
 	u64 fault_kicks_delayed;	/* P5.2 injected */
 	u64 fault_lens_corrupted;	/* P5.2 injected */
+	u64 rx_csum_errors;		/* NAPI: invalid CSUM_PARTIAL offsets from the peer */
 };
 
 /* Ring selftest (P2.3): sequence-numbered pseudo-random payloads. */

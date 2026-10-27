@@ -28,6 +28,11 @@
 #include <time.h>
 #include <unistd.h>
 
+/* Kernel spellings the driver's ABI header uses. */
+typedef uint16_t u16;
+typedef uint32_t u32;
+#define static_assert _Static_assert
+#define __aligned(x) __attribute__((aligned(x)))
 #include "../driver/mlink_shm.h"	/* the driver's ABI, userspace-safe */
 
 static volatile u32 *u32_at(uint8_t *shm, size_t off)

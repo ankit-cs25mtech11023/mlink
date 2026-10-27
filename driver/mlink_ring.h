@@ -24,8 +24,19 @@ struct mlink_ring {
 struct mlink_rx_desc {
 	u32 len;
 	u16 proto;
+	u16 flags;
 	u32 seq;
+	u16 csum_start;
+	u16 csum_offset;
 	const u8 *data;
+};
+
+/* What the producer tells the consumer about one packet. */
+struct mlink_tx_meta {
+	u16 proto;
+	u16 flags;
+	u16 csum_start;
+	u16 csum_offset;
 };
 
 void mlink_ring_attach(struct mlink_ring *r, void *base, bool producer);
@@ -35,7 +46,7 @@ void mlink_ring_reset_consumer(struct mlink_ring *r);
 /* producer side */
 int mlink_ring_free(struct mlink_ring *r);
 void *mlink_ring_slot(struct mlink_ring *r);
-void mlink_ring_publish(struct mlink_ring *r, u32 len, u16 proto, u32 seq);
+void mlink_ring_publish(struct mlink_ring *r, u32 len, const struct mlink_tx_meta *m, u32 seq);
 bool mlink_ring_need_kick(struct mlink_ring *r, bool safe);
 bool mlink_ring_arm_space(struct mlink_ring *r, bool safe);
 void mlink_ring_disarm_space(struct mlink_ring *r);

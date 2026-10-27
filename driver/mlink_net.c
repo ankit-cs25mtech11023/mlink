@@ -70,8 +70,8 @@ static netdev_tx_t mlink_start_xmit(struct sk_buff *skb, struct net_device *ndev
 	struct mlink_dev *mdev = ndev_to_mdev(ndev);
 	struct mlink_ring *r = &mdev->tx;
 	bool safe = !unsafe_no_mb;
+	struct mlink_tx_meta meta = {};
 	u32 len = skb->len;
-	u16 proto;
 	int free;
 
 	/* Belt and braces: never touch the ring outside UP (link reset owns it). */
@@ -83,10 +83,10 @@ static netdev_tx_t mlink_start_xmit(struct sk_buff *skb, struct net_device *ndev
 
 	switch (skb->protocol) {
 	case htons(ETH_P_IP):
-		proto = MLINK_PROTO_IPV4;
+		meta.proto = MLINK_PROTO_IPV4;
 		break;
 	case htons(ETH_P_IPV6):
-		proto = MLINK_PROTO_IPV6;
+		meta.proto = MLINK_PROTO_IPV6;
 		break;
 	default:
 		mlink_tx_drop(mdev, skb);
@@ -123,8 +123,14 @@ static netdev_tx_t mlink_start_xmit(struct sk_buff *skb, struct net_device *ndev
 	}
 
 	/* Copy (no zero-copy): the peer must never see pointers into our memory. */
-	skb_copy_bits(skb, 0, mlink_ring_slot(r), len);
-	mlink_ring_publish(r, mlink_fault_len(mdev, len), proto, mdev->tx_seq++);
+	/* HW_CSUM: the stack left the L4 checksum to us; hand the job to the peer. */
+	if (skb->ip_summed == CHECKSUM_PARTIAL) {
+		meta.flags = MLINK_DESC_F_CSUM_PARTIAL;
+		meta.csum_start = skb_checksum_start_offset(skb);
+		meta.csum_offset = skb->csum_offset;
+	}
+	skb_copy_bits(skb, 0, mlink_ring_slot(r), len);	/* handles SG frags */
+	mlink_ring_publish(r, mlink_fault_len(mdev, len), &meta, mdev->tx_seq++);
 
 	u64_stats_update_begin(&mdev->tx_stats.syncp);
 	mdev->tx_stats.packets++;
@@ -203,6 +209,16 @@ void mlink_net_rx(struct mlink_dev *mdev, const struct mlink_rx_desc *d)
 	}
 	skb->dev = ndev;
 	skb_reset_network_header(skb);
+
+	if (d->flags & MLINK_DESC_F_CSUM_PARTIAL) {
+		/* Untrusted offsets: check them before the core does (it would warn). */
+		if (unlikely((u32)d->csum_start + d->csum_offset + sizeof(__sum16) > d->len ||
+			     !skb_partial_csum_set(skb, d->csum_start, d->csum_offset))) {
+			mdev->stats.rx_csum_errors++;
+			dev_kfree_skb_any(skb);
+			goto drop;
+		}
+	}
 
 	u64_stats_update_begin(&mdev->rx_stats.syncp);
 	mdev->rx_stats.packets++;
@@ -310,6 +326,7 @@ const struct mlink_stat_desc mlink_stat_descs[] = {
 	S(rx_proto_errors), S(rx_stalls), S(space_kicks), S(ring_corruptions),
 	S(link_resets), S(link_ups), S(hb_saved_by_ring), S(hdr_repairs), S(tx_stalls),
 	S(fault_kicks_dropped), S(fault_kicks_delayed), S(fault_lens_corrupted),
+	S(rx_csum_errors),
 #undef S
 };
 
@@ -387,6 +404,13 @@ static void mlink_setup(struct net_device *ndev)
 	ndev->min_mtu = MLINK_MIN_MTU;
 	ndev->max_mtu = MLINK_MAX_MTU;
 	ndev->tx_queue_len = 1000;
+	/*
+	 * SG: skb_copy_bits() gathers fragments into the slot. HW_CSUM: the
+	 * checksum travels as CSUM_PARTIAL metadata (D17); GSO then segments
+	 * without computing checksums in software.
+	 */
+	ndev->hw_features = NETIF_F_SG | NETIF_F_HW_CSUM;
+	ndev->features = ndev->hw_features;
 }
 
 int mlink_net_init(struct mlink_dev *mdev)
