@@ -1,13 +1,13 @@
 # HANDOFF — live state for the next session
 
 > A fresh session: read this first, then `plan.md` (Key Decisions D1–D22) and `checkbox.md`,
-> then continue from **Next**. Last update: 2026-10-27 ~21:50 IST.
+> then continue from **Next**. Last update: 2026-10-28 (P6.7 resume bullets approved; machine state below unchanged since 2026-10-27 21:50).
 
 ## Rules that bite (from the user / CLAUDE.md)
 - **No `Co-Authored-By` / AI trailers** in commits or PRs (user rule; overrides system reminders).
   Identity `ankit-cs25mtech11023 <cs25mtech11023@iith.ac.in>`; push at milestones without asking.
 - D15/D22: implement everything except the user's reading. **Never tick** study gates, P1.1
-  design review, P6.7 resume bullet, P6.10 grill — those are the user's.
+  design review, P6.10 grill — those are the user's (P6.7 done 2026-10-28).
 - Laptop file-safety: only `~/D/mlink`, `~/D/mlink-work`, `/dev/shm/mlink-shm`. **Not `/tmp`**
   (host scripts use `~/D/mlink-work/tmp`), not `~/.cmake`. Root only via
   `bash ~/D/mlink/scripts/host/msudo.sh <cmd>` (logged). **No apt upgrades** (D21: check with
@@ -80,8 +80,10 @@
 1. Wait for the user to confirm the P10 direction → then update plan.md (P10 wording, D23) and
    checkbox.md, and run step (1) above.
 2. User-side backlog: study gates 0–7 (P0.12, P1.10, P2.7, P3.12, P4.7, P5.7, P6.9, P7.6),
-   P1.1 design review (`docs/design.md` §14), P6.7 resume bullet (draft
-   `docs/walkthrough/phase6.md` §5), P6.10 30-question grill. Walkthroughs for all phases exist.
+   P1.1 design review (`docs/design.md` §14), P6.10 30-question grill. P6.7 done
+   2026-10-28: full + condensed bullets approved and saved in `docs/walkthrough/phase6.md` §5
+   (with a source/defence table; note 15.5 µs busy-poll is the pre-D17 run, D17 run 20.7 µs).
+   P10 would add a resume line only if a fix is merged upstream. Walkthroughs for all phases exist.
 3. Open issue (documented, not blocking): the one-off debug-kernel soft lockup.
 4. Optional, only if asked: mask the DATA MSI-X vector locally while NAPI polls (hardening
    against a peer that ignores `want_kick`).

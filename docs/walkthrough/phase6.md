@@ -66,16 +66,51 @@ from them.
     the detector; shrinking it trades false positives (we saw heartbeat starvation under load)
     for faster detection.
 
-## 5. Draft resume bullet (needs your approval — P6.7)
+## 5. Resume bullets (approved by the user 2026-10-28 — P6.7)
 
-> **Linux network device driver for a shared-memory modem link** (C, Linux kernel, QEMU/KVM):
-> built a raw-IP PCI `net_device` (MSI-X, NAPI, lock-free shared-memory rings with kick
-> suppression) between two KVM guests — **7.2 Gbit/s TCP** (9.9 at 4 KB MTU), **15 µs p50**
-> UDP round trip with busy-poll; **subsystem-restart recovery in 90 ms with live TCP flows
-> surviving**; survived **1 200 shared-memory corruption injections** KASAN-clean; ring
-> ordering verified with **LKMM litmus tests**.
+Plain text for Word/LaTeX; **bold** = bold on the resume. Use a non-breaking space between
+number and unit (`7.8~Gbit/s`, `15.5~µs`, `90~ms` in LaTeX).
 
-Every number in it is in `docs/results.md` with its raw file.
+### Full (4 bullets)
+
+**Linux Network Device Driver for a Shared-Memory Modem Link**
+
+- Built a raw-IP PCI network driver (MSI-X, NAPI, lock-free shared-memory rings, checksum
+  offload) linking two KVM guests as application processor and modem: **7.8 Gbit/s TCP** and
+  **15.5 µs p50** UDP round trip (busy-poll).
+- Implemented modem-style **subsystem restart** using heartbeats and a generation handshake:
+  **90 ms outage** with live TCP flows surviving; a killed peer VM is detected within
+  **520 ms** and re-paired automatically.
+- Hardened the driver against an untrusted peer: survived **1,201 shared-memory corruption
+  injections** with no crash and KASAN clean; verified ring memory ordering with **LKMM litmus
+  tests**; found and fixed **two data races** with KCSAN.
+- Extended it with a QMI-like control plane exposed to userspace through a misc character
+  device and daemon, a **Zephyr RTOS** modem, and an **arm64** modem peer, all working against
+  the unchanged x86 driver.
+
+### Condensed (3 bullets)
+
+- Built a raw-IP PCI network driver (MSI-X, NAPI, lock-free shared-memory rings, checksum
+  offload) linking two KVM guests as application processor and modem: **7.8 Gbit/s TCP** and
+  **15.5 µs p50** UDP round trip (busy-poll).
+- Implemented modem-style **subsystem restart** using heartbeats and a generation handshake,
+  giving a **90 ms outage** with live TCP flows surviving; survived **1,201 shared-memory
+  corruption injections** KASAN-clean.
+- Verified ring memory ordering with **LKMM litmus tests** and fixed **two data races** found
+  by KCSAN; added **Zephyr RTOS** and **arm64** modem peers running against the unchanged x86
+  driver.
+
+### Where each number comes from (`docs/results.md`)
+
+| Claim | Source | Defend it with |
+|---|---|---|
+| 7.8 Gbit/s TCP | D17 table, AP→modem MTU 1500 median 7 759 Mbit/s (`perf-d17/`) | perf kernel, turbo off (1.6 GHz) → conservative; 11.1 Gbit/s at MTU 4000; post-KCSAN re-run 7.4–7.5 (within noise, A/B in `perf-r2/`) |
+| 15.5 µs p50 busy-poll | latency table, `SO_BUSY_POLL` 50 µs both ends | pre-D17 run; the D17 run measured 20.7 µs (path untouched by D17, run-to-run variation, both reported); 44 µs p50 with interrupts |
+| 90 ms outage | SSR table, both drivers restarted at once | detected via STATE kick; TCP survives |
+| 520 ms detection | SSR table, modem VM `kill -9` | heartbeat timeout (500 ms) after the last heartbeat; new peer ID picked up; TCP dies there (peer stack gone) |
+| 1,201 corruptions | correctness table, `p5-chaos-debug.txt` | 7 modes, debug kernel, recovery ≤ 3.2 s |
+| LKMM litmus | `litmus/` | proves the protocol ordering (MP + SB), not the whole driver |
+| Two KCSAN races | P5.4, `bench/results/kcsan/` | ring local index (`WRITE_ONCE`/`READ_ONCE`), netdev stats (`u64_stats_t`) |
 
 ## 6. Optimisation after measuring (D17): checksum offload across the link
 

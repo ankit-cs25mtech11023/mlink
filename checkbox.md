@@ -78,7 +78,7 @@
 - [x] P6.4 Run experiment matrix (doorbell RTT, throughput vs MTU/NAPI weight, latency modes, IRQs/packet vs load, SSR times, profile breakdown)
 - [x] P6.5 Create Windows `.venv` + pinned `bench/requirements.txt`, write `bench/plot.py`, and generate plots into docs/img
 - [x] P6.6 Write `docs/results.md` (methodology + caveats) and full README (diagram, how to run, results, prior art, limitations)
-- [ ] P6.7 Fill the resume bullet from measured numbers and get user approval
+- [x] P6.7 Fill the resume bullet from measured numbers and get user approval — approved 2026-10-28 (full + condensed, `docs/walkthrough/phase6.md` §5)
 - [x] P6.8 Write `docs/walkthrough/phase6.md`
 - [ ] P6.9 Study gate 6 passed (results defense)
 - [ ] P6.10 Run full 30-question interview mock grill and update `docs/interview-qa.md`

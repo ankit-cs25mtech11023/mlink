@@ -19,7 +19,7 @@ All implementation done (2026-10-27): MVP P0-P6, P7 control plane, P8 Zephyr mod
 full IP stack, control plane), P9 arm64 modem vs x86 AP, P5.4/P5.5 soaks. P10 QEMU patch
 prepared and tested in `upstream/` — waits for the user's full name, SMTP app password and
 go-ahead to send. P11 descoped (no hardware, D22). Open for the user only: study gates 0-9,
-P1.1 design review, P6.7 resume bullet, P6.10 grill. Known issue: one unreproduced
+P1.1 design review, P6.10 grill (P6.7 resume bullets approved 2026-10-28). Known issue: one unreproduced
 debug-kernel soft lockup (debugging-log).
 
 ## Recent Decisions
