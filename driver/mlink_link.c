@@ -287,7 +287,8 @@ void mlink_link_work(struct work_struct *work)
 	}
 
 	if (mdev->link_state == MLINK_ST_UP) {
-		if (!valid || pstate == MLINK_ST_DOWN)
+		/* Anything but WAIT_PEER/UP (DOWN or a corrupted value) = peer down. */
+		if (!valid || (pstate != MLINK_ST_UP && pstate != MLINK_ST_WAIT_PEER))
 			mlink_link_reset(mdev, MLINK_RESET_PEER_DOWN);
 		else if (pgen != mdev->peer_gen)
 			mlink_link_reset(mdev, MLINK_RESET_PEER_GEN);
@@ -301,7 +302,7 @@ void mlink_link_work(struct work_struct *work)
 	}
 
 	/* WAIT_PEER: acknowledge the peer's current generation... */
-	if (valid && alive && pstate >= MLINK_ST_WAIT_PEER) {
+	if (valid && alive && (pstate == MLINK_ST_WAIT_PEER || pstate == MLINK_ST_UP)) {
 		if (READ_ONCE(mdev->self->peer_gen_seen) != pgen) {
 			mdev->peer_gen = pgen;
 			/* Our gen/reset are already published; the ack comes after. */

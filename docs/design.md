@@ -1,7 +1,9 @@
-# mlink design (v1 draft — for review in P1.1)
+# mlink design (v2 — as implemented)
 
-> Status: **draft, awaiting the user's review** (P1.1). Source: `plan.md` §6. Anything changed
-> here that contradicts plan.md is first changed in plan.md.
+> Status: describes the code at the commit that last touched this file. Cross-checked against
+> the implementation on 2026-10-27 (v1 was the pre-implementation draft). The user's P1.1
+> review is still pending — open questions in §14. Changes that contradict `plan.md` go into
+> `plan.md` first.
 
 ## 1. Picture
 
@@ -17,167 +19,235 @@
         └──── eventfd (ivshmem-server wiring) ──────────┘
 ```
 
-A "kick" = writing `(peer_id << 16) | vector` to our BAR0 Doorbell register. QEMU signals
-the peer's eventfd for that vector, and the peer's QEMU raises that MSI-X vector in the peer
-guest. Shared memory carries all data and state; kicks only say "go look".
+A **kick** = `iowrite32((peer_id << 16) | vector, BAR0 + 0x0C)`. QEMU (VM exit) signals the
+peer's eventfd for that vector; the peer's QEMU injects that MSI-X vector into the peer guest.
+Shared memory carries all data and state; kicks only say "go look".
 
 ## 2. Device facts (ivshmem-doorbell, PCI 1af4:1110)
 
-| BAR | What | Notes |
+| BAR | Contents | How we use it |
 |---|---|---|
-| BAR0 | 256 B MMIO: `0x00 IntrMask`, `0x04 IntrStatus` (INTx only), `0x08 IVPosition` (RO, own peer ID), `0x0C Doorbell` (WO) | mapped with `pcim_iomap_region`, accessed with `ioread32/iowrite32` |
-| BAR1 | MSI-X table + PBA | used by the PCI core, not by us |
-| BAR2 | shared memory (4 MiB) | mapped `devm_memremap(MEMREMAP_WB)` = ordinary cacheable RAM |
+| BAR0 | 256 B MMIO: `IntrMask` 0x00, `IntrStatus` 0x04 (INTx only), `IVPosition` 0x08 (RO), `Doorbell` 0x0C (WO) | `pcim_iomap_region`; `ioread32(IVPosition)` once at probe; `iowrite32(Doorbell)` per kick |
+| BAR1 | MSI-X table + PBA | PCI core (`pci_alloc_irq_vectors(4, 4, PCI_IRQ_MSIX)`) |
+| BAR2 | shared memory (4 MiB, ≥ `MLINK_LAYOUT_END`) | `pcim_request_region` + `devm_memremap(MEMREMAP_WB)` |
 
-- Peer IDs are handed out by ivshmem-server and **change when a VM reconnects**. Each side
-  publishes its own ID in its state block, and the other side reads it from there.
-- Kicks to a peer that is not connected are silently dropped. The device never reports a
-  peer's death → **heartbeat** (§8).
+- `pci_set_master()` is required: QEMU delivers MSI-X writes through the bus-master address space.
+- Peer IDs are assigned by ivshmem-server and **change when a VM reconnects** → each side
+  publishes its own ID in its state block; the other side re-reads it every link poll.
+- Kicks to an absent peer are silently dropped; the device never reports peer death → §9.
 
-## 3. Roles
+## 3. Roles and parameters
 
-One `mlink.ko`, module parameter `role=ap|modem` (required). The **AP is the layout master**:
-if the header magic is absent, it writes the header. The modem waits until the header is
-valid and matches its own compiled-in layout, then proceeds. The data path is symmetric.
+One `mlink.ko`; `role=ap|modem` (required, validated in `mlink_init` before the PCI driver is
+registered). The **AP owns the global header**; the data path is symmetric.
 
-## 4. Shared-memory layout (4 MiB, fixed for the MVP)
+| Parameter | Default | Meaning |
+|---|---|---|
+| `role` | — (required) | `ap` or `modem` |
+| `hb_ms` | 100 | link poll / heartbeat period |
+| `hb_timeout_ms` | 500 | peer declared lost after this long without heartbeat **or** ring progress |
+| `napi_weight` | 64 | NAPI budget, clamped 1..64 (`NAPI_POLL_WEIGHT`) |
+| `kick_suppress` | 1 | kick only when the peer asked (0 = kick every publish; experiment) |
+| `unsafe_no_mb` | 0 | **experiment only**: drop the kick-path full barriers (P2.4) |
 
-| Offset | Size | Region | Written by |
+## 4. Shared-memory layout (4 MiB, fixed; `driver/mlink_shm.h` + `static_assert`s)
+
+| Offset | Size | Region | Writer |
 |---|---|---|---|
-| `0x000000` | 4 KiB | Global header | AP (once, at init) |
-| `0x001000` | 64 B | State block AP | AP only |
-| `0x001040` | 64 B | State block MODEM | modem only |
-| `0x002000` | 4 KiB | Ring A (AP→MODEM) control (4 cache lines) | split, see §5 |
-| `0x003000` | 4 KiB | Ring A descriptors `desc[256]` × 16 B | AP |
-| `0x004000` | 1 MiB | Ring A slots `slot[256]` × 4 KiB | AP |
-| `0x104000` | 4 KiB | Ring B (MODEM→AP) control | split |
-| `0x105000` | 4 KiB | Ring B descriptors | modem |
-| `0x106000` | 1 MiB | Ring B slots | modem |
-| `0x206000` | ~1.98 MiB | reserved (P7 control rings) | — |
+| `0x000000` | 64 B used (4 KiB page) | global header | AP |
+| `0x001000` | 64 B | state block AP | AP |
+| `0x001040` | 64 B | state block MODEM | modem |
+| `0x002000` | 256 B (4 KiB page) | ring A (AP→MODEM) control: 4 cache lines | split, §5.1 |
+| `0x003000` | 4 KiB | ring A descriptors `desc[256]` × 16 B | AP |
+| `0x004000` | 1 MiB | ring A slots `slot[256]` × 4 KiB | AP |
+| `0x104000` | | ring B (MODEM→AP): same structure | modem / AP |
+| `0x206000` | ~1.98 MiB | reserved (stretch: control rings) | — |
 
-Each ring: N = 256 (power of two), slot size 4096 B → max MTU 4096 (default MTU 1500).
-`static_assert` in `mlink_shm.h` pins every offset and size.
+`N = 256` (power of two), slot = 4096 B → MTU ≤ 4096. The tool `shm_chaos` includes this same
+header (userspace-safe), so layout drift between tool and driver is a compile error.
 
-### 4.1 Global header
-`magic = "MLNK"`, `abi_version`, `ring_entries`, `slot_size`, `ring_a_off`, `ring_b_off`,
-`layout_crc` (CRC32 of the fields above). The modem refuses a header whose values differ
-from its own constants (version skew between the two builds = refuse, not guess).
+### 4.1 Global header (64 B)
+`magic` "MLNK", `abi_version` (**2**), `ring_entries`, `slot_size`, `ring_a_off`, `ring_b_off`,
+`layout_crc` = `crc32_le` over `abi_version..ring_b_off`.
+- **Publish (AP):** `magic = 0`, `virt_wmb()`, write fields, `virt_store_release(magic)`.
+- **Validate:** `virt_load_acquire(magic)`, read every field once into a local, compare all
+  fields **and** the CRC with this build's constants. Any difference = refuse (no guessing
+  across version skew).
+- **Repair:** the AP re-validates every link poll and rewrites a damaged header
+  (`hdr_repairs`). The modem validates once before starting; afterwards it uses its compiled
+  constants, so later header damage cannot change how it indexes memory.
 
-### 4.2 State block (one per side, 64 B, one cache line)
-`magic`, `peer_id` (own IVPosition), `state` (DOWN/WAIT_PEER/UP), `gen` (bumped on every
-(re)start), `peer_gen_seen` (last peer `gen` I acknowledged), `heartbeat` (incremented every
-`hb_ms`), `mtu`, `features`.
+### 4.2 State block (one 64 B cache line per side, owner writes only)
+`magic`, `peer_id` (own IVPosition), `state` (DOWN 0 / WAIT_PEER 1 / UP 2), `gen`,
+`peer_gen_seen`, `heartbeat`, `mtu`, `features` (unused, 0).
+Published with `virt_store_release(magic)` after the other fields. `mtu` is informational:
+the receiver accepts any length ≤ slot size regardless of its own MTU.
 
 ## 5. Rings
 
-### 5.1 Control block — each line has exactly one writer
-| Cache line | Field | Writer (ring A / ring B) | Meaning |
+### 5.1 Control block — one writer per cache line
+| Line | Field | Writer | Meaning |
 |---|---|---|---|
-| 0 | `prod` | AP / modem | free-running count of published descriptors |
-| 1 | `cons` | modem / AP | free-running count of consumed descriptors |
-| 2 | `prod_flags.want_space` | AP / modem | "producer is stopped, kick SPACE when you free slots" |
-| 3 | `cons_flags.want_kick` | modem / AP | "consumer is idle, kick DATA when you publish" |
+| 0 | `prod` | producer | free-running count of published descriptors |
+| 1 | `cons` | consumer | free-running count of consumed descriptors |
+| 2 | `want_space` | producer | "I'm stopped on a full ring; SPACE-kick me when you free slots" |
+| 3 | `want_kick` | consumer | "I'm idle; DATA-kick me when you publish" |
 
-Separate 64 B lines so the two sides never write to the same cache line (no false sharing,
-and the single-writer rule is visible in the layout itself).
+### 5.2 Descriptor (16 B, ABI v2) — descriptor *i* always describes slot *i*
+| Field | Meaning |
+|---|---|
+| `u32 len` | payload bytes in the slot, 1..4096 |
+| `u16 proto` | `0x0800` IPv4, `0x86dd` IPv6, `0xfffe` selftest |
+| `u16 flags` | `MLINK_DESC_F_CSUM_PARTIAL` (0x1): L4 checksum not filled in |
+| `u32 seq` | producer sequence (selftest, debugging) |
+| `u16 csum_start`, `u16 csum_offset` | valid with `CSUM_PARTIAL` (virtio-style offload metadata) |
 
-### 5.2 Descriptor (16 B)
-`u32 len`, `u16 proto` (IPv4/IPv6), `u16 flags`, `u32 seq` (debug/selftest), `u32 rsvd`.
-Descriptor `i` always describes slot `i` — no peer-supplied offsets or pointers anywhere.
+No peer-supplied offsets or pointers are ever used for addressing; `csum_*` are bounds-checked
+offsets *within* the copied packet.
 
 ### 5.3 Indices
-`prod`/`cons` are free-running `u32`; slot = `idx & (N-1)`. Used = `prod - cons` (unsigned
-wrap-around is correct). Invariant: `prod - cons ≤ N`; anything else = corruption.
+Free-running `u32`; slot = `idx & (N-1)`; fill = `prod - cons` (unsigned wrap is correct).
+Invariant `prod - cons ≤ N`. Each side keeps a **local copy** of the index it owns and never
+reads it back from shm; it reads only the other side's index.
 
-## 6. Memory ordering (both sides x86 little-endian for the MVP)
+## 6. Memory ordering (`virt_*` barriers; x86 little-endian both sides)
 
-BAR2 is normal WB memory shared with another VM, so we use the `virt_*` barriers
-(`virt_store_release`, `virt_load_acquire`, `virt_mb`) and `READ_ONCE/WRITE_ONCE` on every
-shared field.
+BAR2 is ordinary write-back memory shared with another VM, so `virt_*` barriers (they stay
+real barriers even in a `CONFIG_SMP=n` guest) and `READ_ONCE/WRITE_ONCE` on every shared field.
 
-**Publish (producer):** copy payload into slot → write desc → `virt_store_release(&prod, prod+1)`.
-**Consume (consumer):** `p = virt_load_acquire(&prod)` → for each entry: `len = READ_ONCE(desc.len)`
-**once**, validate, copy out of the slot → `virt_store_release(&cons, cons+1)`.
-
-Release/acquire pairs "payload+desc written" with "payload+desc read" (message-passing
-pattern, litmus test `mlink-publish.litmus` in P2.5).
-
-### 6.1 Kick suppression (store-buffering pattern)
-```
-consumer going idle:                 producer after publishing:
-  want_kick = 1                        prod = p + 1          (release)
-  virt_mb()                            virt_mb()
-  if (prod != cons) poll again         if (want_kick) kick DATA
-```
-Without **both** full barriers, each side's store can sit in its store buffer while it reads
-the other's old value: consumer sees no new data, producer sees `want_kick == 0`, nobody
-kicks → lost wakeup, the link stalls. x86 allows exactly this store→load reordering, so this
-is a real bug on x86, not a theoretical one (litmus `mlink-kick.litmus`, experiment P2.4).
-The TX-space direction (`want_space`) uses the same pattern.
-
-### 6.2 Shared memory is untrusted input
-The peer may be buggy or malicious (and P5 corrupts it on purpose). Rules:
-1. Read every peer-written field once into a local, then validate the local (no double fetch).
-2. `prod - cons > N`, `len > slot_size`, unknown `proto` → count error, drop / request link
-   reset. Never crash, never index with an unchecked value.
-3. Never use a peer-provided offset or pointer.
-
-## 7. Interrupt vectors
-
-| Vector | Name | Sender → receiver meaning | Receiver action |
-|---|---|---|---|
-| 0 | DATA | "new descriptors in the ring you consume" | clear `want_kick`, `napi_schedule` |
-| 1 | SPACE | "I freed slots you produce into" | `netif_wake_queue` if space |
-| 2 | STATE | "my state block changed" | schedule link work (fast SSR path) |
-| 3 | TEST | ping-pong / diagnostics (P1) | modem: kick back; AP: record RTT |
-
-## 8. Link state machine & SSR (detailed in P4.1)
-
-```
- DOWN ──probe──► WAIT_PEER ──two-way gen ack──► UP
-                   ▲                              │ hb timeout / peer gen changed /
-                   │                              │ STATE kick with state=DOWN
-                   └────── RESETTING ◄── PEER_LOST┘
-```
-- UP requires: valid header, peer `state ≥ WAIT_PEER`, `peer.peer_gen_seen == my.gen` and
-  `my.peer_gen_seen == peer.gen` (both sides acknowledged each other's current generation).
-- Reset (in the link work item, process context): carrier off → stop queue → `napi_disable`
-  → drop in-flight TX → reset only the fields **this side owns** → `WAIT_PEER`.
-- Heartbeat `hb_ms` = 100, timeout `hb_timeout_ms` = 500 (module params).
-
-### 8.1 State machine as implemented (P4.1, `driver/mlink_link.c`)
-
-| Field | Writer | Meaning |
+| Operation | Sequence | Pattern / litmus |
 |---|---|---|
-| `state` | owner | DOWN / WAIT_PEER / UP |
-| `gen` | owner | bumped at every (re)start **before** the owner zeroes its ring fields |
-| `peer_gen_seen` | owner | the peer `gen` the owner acknowledged (written after own gen/reset, `virt_wmb`) |
-| `heartbeat` | owner | +1 every `hb_ms` |
-| ring `prod`,`want_space` / `cons`,`want_kick` | producer / consumer | zeroed by their owner on reset |
+| publish | slot payload, desc fields → `virt_store_release(prod)` | MP, `mlink-publish` |
+| peek | `virt_load_acquire(prod)` → desc fields once → payload | MP |
+| release | after all slot reads of a NAPI poll → `virt_store_release(cons)` (**once per poll**, batched) | LB, `mlink-slot-reuse` |
+| free (producer) | `virt_load_acquire(cons)` → then overwrite slots | LB |
+| kick decision (DATA) | producer: store prod → `virt_mb` → load `want_kick`; consumer: store `want_kick=1` → `virt_mb` → re-load `prod` | SB, `mlink-kick` (+2 broken variants) |
+| kick decision (SPACE) | consumer: store cons → `virt_mb` → load `want_space`; producer: store `want_space=1` → `virt_mb` → re-load `cons` | SB |
+| new generation | `gen++` → `virt_wmb` → zero own ring fields | §9.2 |
+| ack | own reset done → `virt_wmb` → write `peer_gen_seen`; reader: load ack → `virt_rmb` → load `gen` | §9.2 |
 
-Transitions (all in the link work, process context, one instance at a time):
-- **WAIT_PEER → UP** when the peer block is valid, its heartbeat is live, peer `state ≥
-  WAIT_PEER`, we have acked its current `gen`, and it has acked ours. Because every reset bumps
-  `gen` before zeroing, "both acked the current gens" implies "both finished resetting".
-- **UP → (reset) → WAIT_PEER** on: peer block invalid or `state == DOWN` (graceful, signalled
-  with a STATE kick), peer `gen` changed (restart), heartbeat unchanged for `hb_timeout_ms`,
-  or a ring index error flagged by the data path (`rx_broken`/`tx_broken`) with unchanged gen
-  (= real corruption, counted).
-- **Reset:** carrier off → `netif_tx_disable` (waits for xmit) → `napi_disable` (waits for
-  poll) → `link_up=false`, wake + wait out a selftest producer (`st.lock`) → bump `gen`, zero
-  owned ring fields → publish WAIT_PEER → STATE kick.
-- **UP:** publish UP → `napi_enable` → schedule a first poll (drains + arms the DATA kick) →
-  carrier on → wake queue → STATE kick.
-- The data path never takes a link lock: it is *stopped* before anything it uses changes.
+A store-release does **not** order a store before a *later load*; that is why the kick paths
+need full barriers (`mlink-kick-no-producer-mb`: Sometimes).
 
-## 9. Teardown order (rmmod / probe failure)
-`state = DOWN` + STATE kick → unregister netdev → stop link work (`cancel_delayed_work_sync`)
-→ mark `dying`, free IRQs → free MSI-X vectors → unmap (devm). IRQ handlers check `dying`.
+## 7. Shared memory is untrusted input (threat model)
 
-## 10. Questions for the review (P1.1)
-1. Fixed 4 KiB slots waste memory for small packets (a 64 B ACK uses a 4 KiB slot). Accepted
-   for the MVP: simple, and each slot is owned by exactly one descriptor. OK?
-2. Copy on both sides (no zero-copy). Two copies per packet; simple and safe against an
-   untrusted peer. Measured in P6 (copy cost). OK?
-3. N = 256 entries per direction. Ring-size sweep in P6 (64/256/1024 needs a layout param →
-   stretch). OK?
+The peer may be buggy, crashed mid-write, or hostile; `tools/shm_chaos` attacks from the host.
+1. **Read once, validate the copy** (no double fetch): indices, `len`, `proto`, `flags`,
+   `csum_*`, state-block fields, header fields.
+2. **Bounds:** `prod - cons ≤ N`; `1 ≤ len ≤ 4096`; `csum_start + csum_offset + 2 ≤ len`;
+   `peer_id ≤ 0xFFFF` and ≠ own; peer `state` ∈ {WAIT_PEER, UP} (anything else = down).
+3. **Classify from our copy:** IP version taken from `skb->data[0]` after the copy.
+4. **Escalation:** impossible index → latch `rx_broken`/`tx_broken` → link work resets.
+   Peer gen changed → restart (normal); unchanged → counted as `ring_corruptions`.
+5. **Control decisions use local facts only.** Watchdogs never trust shm flags (a cleared
+   `want_kick` produced a silent black hole in P5.1 — debugging-log).
+6. **Not defended:** a peer flooding doorbells causes an interrupt storm (no per-vector rate
+   limiting; MSI-X can't be masked through ivshmem registers). Data integrity of IP payload is
+   the stack's job (except with `CSUM_PARTIAL`, where shared memory is trusted not to flip
+   bits — same assumption as virtio/veth).
+
+## 8. Interrupt vectors and execution contexts
+
+| Vector | Sender meaning | Receiver (hard-IRQ) action |
+|---|---|---|
+| 0 DATA | new descriptors in your RX ring | `want_kick = 0`, `napi_schedule_irqoff` |
+| 1 SPACE | I freed slots in your TX ring | wake netdev queue if stopped + space; wake selftest `tx_wq` |
+| 2 STATE | my state block changed | `mod_delayed_work(link_work, 0)` |
+| 3 TEST | ping-pong | modem: kick back; AP: timestamp, `complete()` |
+
+All handlers do nothing until `ready` (set last in probe, cleared first in remove).
+
+| Context | Code | May sleep? | Touches |
+|---|---|---|---|
+| hard IRQ | 4 handlers above | no | flags, NAPI schedule, queue wake |
+| softirq (NAPI) | `mlink_napi_poll` → `mlink_rx_poll` → `mlink_net_rx` | no | RX ring (consumer), skbs, rx stats |
+| BH-off, TX lock | `mlink_start_xmit` | no | TX ring (producer), tx stats |
+| process (WQ_HIGHPRI) | `mlink_link_work` every `hb_ms` | yes | state blocks, heartbeat, resets, watchdogs, header repair |
+| process (debugfs) | pingpong, selftest TX | yes | TEST vector, TX ring (selftest owner) |
+
+**Single producer per ring:** `tx_owner` (`atomic_cmpxchg`) admits either the netdev
+(`ndo_open`) or the selftest, never both.
+**Locks:** none on the data path. `st.lock` (selftest run), `pp.lock` (pingpong run). The
+link work is serialized by the workqueue (one instance), and it *stops* the data path
+(`netif_tx_disable`, `napi_disable`) before changing anything the data path uses.
+
+## 9. Link state machine & Subsystem Restart
+
+### 9.1 States (published in the state block)
+```
+            probe / header valid
+   DOWN ─────────────────────────► WAIT_PEER ──── two-way gen ack + peer alive ────► UP
+     ▲                                ▲                                              │
+     │ rmmod (state=DOWN,             │      reset: link_up=0 → stop data path →     │
+     │  magic=0, STATE kick)          └───── gen++ → zero own ring fields ◄──────────┘
+```
+UP → reset when: peer block invalid or peer `state` ∉ {WAIT_PEER, UP}; peer `gen` changed;
+no heartbeat **and** no ring progress for `hb_timeout_ms`; `rx_broken`/`tx_broken` latched.
+
+### 9.2 Why the handshake is safe
+Every (re)start bumps `gen` **before** zeroing the owner's ring fields, and the ack of the
+peer's gen is written **after** that (`virt_wmb`; reader `virt_rmb`). So "each side has acked
+the other's *current* gen" ⇒ both finished resetting ⇒ all four indices are zero ⇒ the data
+path can start. A peer that observes our zeroed index also observes our new gen, so it treats
+the impossible index as a restart, not corruption.
+
+### 9.3 Liveness
+Alive = heartbeat changed **or** the peer's ring progress fingerprint (its `prod` on our RX
+ring, its `cons` on our TX ring) changed within `hb_timeout_ms`. Ring progress was added after
+measuring heartbeat starvation (3.6–5.2 s) under bulk TCP on the debug kernel.
+
+### 9.4 Reset sequence (link work only)
+`link_up = false` → carrier off → `synchronize_irq(SPACE)` → `netif_tx_disable` →
+`napi_disable` → wake `tx_wq`, take `st.lock` (selftest stops) → `gen++`, `virt_wmb`, zero
+own `prod`/`want_space`/`cons`/`want_kick`, clear both error latches → publish WAIT_PEER →
+STATE kick.
+**Bring-up:** publish UP → `link_up = true` → `napi_enable` → first poll (drains, arms DATA
+kick) → carrier on → wake queue → STATE kick.
+
+### 9.5 Watchdogs (UP, every link poll)
+- **RX:** data pending and consumer index unchanged for 2 polls → schedule NAPI (`rx_stalls`).
+- **TX:** queue stopped while the ring has space for 2 polls → wake (`tx_stalls`).
+
+## 10. Network device
+
+Raw-IP point-to-point like `mhi_net`: `ARPHRD_RAWIP`, `IFF_POINTOPOINT | IFF_NOARP`, no
+header ops, MTU 68..4096 (default 1500), `NETIF_F_SG | NETIF_F_HW_CSUM` (D17).
+- **TX:** drop unless link UP; map protocol; ring full while queue running → stop, arm
+  SPACE, re-check, `NETDEV_TX_BUSY`; else `skb_copy_bits` into the slot, fill checksum
+  metadata, publish; on the last free slot stop + arm + re-check; `xmit_more` → one kick per
+  batch; kick only if `want_kick` (full barrier).
+- **RX:** `napi_alloc_skb`, copy out, classify by IP version, optional
+  `skb_partial_csum_set`, `napi_gro_receive`; one `cons` release per poll; SPACE kick if asked;
+  `napi_complete_done` → arm DATA kick → re-check.
+- **Stats:** `ndo_get_stats64` with `u64_stats_sync`; driver counters via `ethtool -S` and
+  debugfs `stats` (one shared table).
+
+## 11. Teardown order (`mlink_remove`)
+`dying = true` → wake `tx_wq` → `debugfs_remove` (waits for running pingpong/selftest) →
+`cancel_delayed_work_sync(link_work)` → `mlink_link_stop` (state DOWN, magic 0, STATE kick) →
+`ready = false` → `devm_free_irq` × 4 (waits for running handlers) → `mlink_net_exit`
+(`netif_tx_disable` + `napi_disable` if UP, `unregister_netdev`, `netif_napi_del`,
+`free_netdev`) → devres: MSI-X vectors, BAR2 unmap/region, BAR0, disable device, `mdev`.
+Rule: stop everything that can create new work before freeing what that work uses.
+
+## 12. Observability and fault injection
+- debugfs `/sys/kernel/debug/mlink/`: `info`, `link`, `ring`, `stats`, `irq_counts`,
+  `ring_doorbell`, `pingpong`, `selftest`, `selftest_rx`, `fault_drop_kick`,
+  `fault_delay_kick_us`, `fault_corrupt_tx_len`.
+- Tracepoints `mlink:mlink_{xmit,kick,irq,napi_poll,rx,link}`.
+- Host-side `tools/shm_chaos` (flip / len / idx / flags / magic / hb / mix).
+
+## 13. Known limitations
+Fixed layout (no ring-size negotiation); two copies per packet; single queue per direction;
+no TSO (GSO segments in software); no interrupt-rate limiting against a hostile peer; x86 only
+at runtime (LKMM covers the model; aarch64 is stretch); both endpoints are Linux VMs on one
+host.
+
+## 14. Open questions for the user's review (P1.1)
+1. Fixed 4 KiB slots waste memory for small packets (a 64 B ACK uses a whole slot) — accepted
+   for simplicity and one-descriptor-per-slot ownership?
+2. Two copies per packet (no zero-copy) — accepted for safety against an untrusted peer;
+   E7 measured ~9 % of samples per side in the slot copy.
+3. N = 256 fixed; a ring-size sweep needs a negotiated layout (stretch).
+4. Should the modem also re-validate the header periodically, or is "validate once, then use
+   compiled constants" the better choice? (Current: validate once.)

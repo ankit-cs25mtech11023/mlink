@@ -1,0 +1,104 @@
+# P5.5 repro attempts of the debug-kernel soft lockup (DEBUG kernel, turbo off)
+# 20-min soak (soak-long.sh 1200) and 75-min soak (soak-long.sh 4500) with modem IRQ/softirq sampling (scripts/host/irqwatch.sh): NO lockup reproduced
+## 75-min run
+=== long soak start 2026-10-27T07:20:16+05:30 dur=4500s temp=45C
+07:22:27 chaos burst 1 done
+07:24:54 modem restart 1 done
+07:27:39 chaos burst 2 done
+07:30:00 modem restart 2 done
+07:32:50 chaos burst 3 done
+07:35:04 modem restart 3 done
+07:38:04 chaos burst 4 done
+07:40:11 modem restart 4 done
+07:43:16 chaos burst 5 done
+07:45:19 modem restart 5 done
+07:48:29 chaos burst 6 done
+07:50:27 modem restart 6 done
+07:53:42 chaos burst 7 done
+07:55:35 modem restart 7 done
+07:58:55 chaos burst 8 done
+08:00:38 modem restart 8 done
+08:04:08 chaos burst 9 done
+08:05:41 modem restart 9 done
+08:09:21 chaos burst 10 done
+08:10:47 modem restart 10 done
+08:14:32 chaos burst 11 done
+08:15:50 modem restart 11 done
+08:19:45 chaos burst 12 done
+08:20:57 modem restart 12 done
+08:24:58 chaos burst 13 done
+08:26:02 modem restart 13 done
+08:30:12 chaos burst 14 done
+08:31:08 modem restart 14 done
+08:35:24 chaos burst 15 done
+=== tcp
+tcp session 1: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 2: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 3: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 4: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 5: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 6: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 7: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 8: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 9: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 10: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 11: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 12: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 13: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 14: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 15: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+=== ping
+38928 packets transmitted, 37520 received, 3.61693% packet loss, time 4499992ms
+rtt min/avg/max/mdev = 0.751/932.294/5795.644/908.243 ms, pipe 65
+=== ap
+state: UP
+link_ups: 533
+link_resets: 532 (hb_timeout 0, peer_gen 239, peer_down 137, ring 156)
+ rx_len_errors: 16  rx_proto_errors: 0  rx_stalls: 789  ring_corruptions: 156  hb_saved_by_ring: 17481  hdr_repairs: 169  tx_stalls: 1
+kmemleak reports: 0
+DMESG GATE: PASS (mlink-ap)
+=== modem
+state: UP
+link_ups: 22
+link_resets: 21 (hb_timeout 0, peer_gen 13, peer_down 2, ring 6)
+ rx_len_errors: 2  rx_proto_errors: 0  rx_stalls: 48  ring_corruptions: 6  hb_saved_by_ring: 739  hdr_repairs: 0  tx_stalls: 0
+kmemleak reports: 0
+DMESG GATE: PASS (mlink-modem)
+=== long soak end 2026-10-27T08:35:55+05:30 chaos_bursts=15 modem_restarts=14 max_temp=57C aborted=0
+governors:  8 powersave;
+no_turbo: 0
+prep: off
+## 20-min run
+=== long soak start 2026-10-27T06:59:02+05:30 dur=1200s temp=47C
+07:01:12 chaos burst 1 done
+07:03:39 modem restart 1 done
+07:06:24 chaos burst 2 done
+07:08:43 modem restart 2 done
+07:11:38 chaos burst 3 done
+07:13:50 modem restart 3 done
+07:16:50 chaos burst 4 done
+07:18:53 modem restart 4 done
+=== tcp
+tcp session 1: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 2: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 3: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+tcp session 4: Mbits/sec/Mbits/sec Mbit/s (rx/tx)
+=== ping
+10632 packets transmitted, 10241 received, 3.67758% packet loss, time 1199851ms
+rtt min/avg/max/mdev = 0.813/945.156/4333.173/945.205 ms, pipe 61
+=== ap
+state: UP
+link_ups: 147
+link_resets: 146 (hb_timeout 0, peer_gen 68, peer_down 38, ring 40)
+ rx_len_errors: 5  rx_proto_errors: 0  rx_stalls: 192  ring_corruptions: 40  hb_saved_by_ring: 4997  hdr_repairs: 44  tx_stalls: 1
+kmemleak reports: 0
+DMESG GATE: PASS (mlink-ap)
+=== modem
+state: UP
+link_ups: 1
+link_resets: 0 (hb_timeout 0, peer_gen 0, peer_down 0, ring 0)
+ rx_len_errors: 0  rx_proto_errors: 0  rx_stalls: 0  ring_corruptions: 0  hb_saved_by_ring: 43  hdr_repairs: 0  tx_stalls: 0
+kmemleak reports: 0
+DMESG GATE: PASS (mlink-modem)
+=== long soak end 2026-10-27T07:19:33+05:30 chaos_bursts=4 modem_restarts=4 max_temp=55C aborted=0
+irqwatch stopped
