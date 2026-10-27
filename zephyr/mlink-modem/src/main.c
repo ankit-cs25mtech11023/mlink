@@ -152,7 +152,7 @@ static void link_bring_up(void)
 	m.st.link_ups++;
 	state_publish(MLINK_ST_UP);
 	WRITE_ONCE(m.link_up, true);
-	modem_net_carrier(true);
+	modem_net_carrier(m.data_call);
 	modem_kick(MLINK_VEC_STATE);
 	printk("mlink-modem: link UP: peer id=%u gen=%u, own gen=%u\n",
 	       m.peer_id, m.peer_gen, m.gen);
@@ -337,6 +337,12 @@ static bool data_poll(void)
 			m.st.bad_len++;
 			goto consume;
 		}
+		if (!READ_ONCE(m.data_call)) {
+			/* "Data call" down (SET_DATA_CALL from the AP): no data service. */
+			m.st.dc_dropped++;
+			goto consume;
+		}
+		m.st.rx_bytes += d.len;
 
 		if (IS_ENABLED(CONFIG_MLINK_MODEM_NET)) {
 			m.st.rx++;
@@ -380,6 +386,7 @@ static bool data_poll(void)
 			mlink_ring_publish(&m.tx, d.len, &meta, m.tx_seq++);
 			published = true;
 			m.st.tx++;
+			m.st.tx_bytes += d.len;
 		} else {
 			m.st.dropped++;
 		}
@@ -407,12 +414,14 @@ static void print_stats(void)
 
 	printk("mlink-modem: %s gen=%u rx=%u tx=%u icmp=%u udp=%u frag=%u stack=%u csum=%u "
 	       "drop=%u badlen=%u full=%u txwait=%u txdrop=%u irq=%u/%u/%u/%u/%u "
-	       "kicks d/s/st=%u/%u/%u ups=%u resets=%u\n",
+	       "kicks d/s/st=%u/%u/%u ups=%u resets=%u ctrl req/resp/inv/full=%u/%u/%u/%u "
+	       "dcdrop=%u\n",
 	       m.state == MLINK_ST_UP ? "UP" : "WAIT", m.gen, s->rx, s->tx, s->icmp, s->udp,
 	       s->frags, s->to_stack, s->csum_fixed, s->dropped, s->bad_len, s->tx_full,
 	       s->tx_waits, s->tx_dropped, s->irqs[0], s->irqs[1], s->irqs[2],
 	       s->irqs[3], s->irqs[4], s->kicks_data, s->kicks_space, s->kicks_state,
-	       s->link_ups, s->link_resets);
+	       s->link_ups, s->link_resets, s->ctrl_req, s->ctrl_resp, s->ctrl_invalid,
+	       s->ctrl_full, s->dc_dropped);
 }
 
 int main(void)
@@ -425,6 +434,7 @@ int main(void)
 
 	k_mutex_init(&m.tx_lock);
 	k_sem_init(&m.space_sem, 0, 1);
+	m.data_call = true;
 	m.dev = DEVICE_DT_GET(DT_NODELABEL(ivshmem0));
 	if (!device_is_ready(m.dev)) {
 		printk("mlink-modem: no ivshmem device\n");
@@ -480,8 +490,10 @@ int main(void)
 			link_tick();
 			next_hb = now + HB_MS;
 		}
-		/* Any wakeup (DATA, SPACE, STATE or timeout) may have data for us. */
+		/* Any wakeup (DATA, SPACE, STATE, CTRL or timeout) may have work for us. */
 		busy = m.link_up && data_poll();
+		if (m.link_up)
+			modem_ctrl_poll();
 
 		if (now >= next_stats) {
 			if (memcmp(&last, &m.st, sizeof(last))) {

@@ -97,7 +97,7 @@ static int mlink_net_send(const struct device *dev, struct net_pkt *pkt)
 	for (;;) {
 		int n;
 
-		if (!READ_ONCE(m.link_up))
+		if (!READ_ONCE(m.link_up) || !READ_ONCE(m.data_call))
 			break;
 		n = mlink_ring_free(&m.tx);
 		if (n < 0) {
@@ -112,6 +112,7 @@ static int mlink_net_send(const struct device *dev, struct net_pkt *pkt)
 				break;
 			mlink_ring_publish(&m.tx, len, &meta, m.tx_seq++);
 			m.st.tx++;
+			m.st.tx_bytes += len;
 			if (mlink_ring_need_kick(&m.tx, true))
 				modem_kick(MLINK_VEC_DATA);
 			break;

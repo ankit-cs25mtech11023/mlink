@@ -1,0 +1,28 @@
+# P8 follow-up (D22, "complete everything"): Zephyr modem serves the P7 control plane
+# zephyr/mlink-modem/src/ctrl.c — rings C/D, same message format (driver/mlink_ctrl.h) and
+# TLV helpers (tools/mlink_ctrl_lib.h) as tools/mlinkd. AP: debug kernel, unchanged mlinkctl.
+# Zephyr: loopback mode, TCG. Builds: loop 280 KB RAM, net 568 KB RAM, 0 warnings.
+
+$ mlinkctl info
+local: role ap link_state 2 gen 67 peer_gen 60 own_id 0 peer_id 52
+modem:
+  link_state   2
+  peer_gen     67
+  mtu          1500
+$ ping -c 3 10.77.0.2; mlinkctl stats
+modem mlink0:
+  rx_packets   3
+  tx_packets   3
+  rx_bytes     252
+  tx_bytes     252
+$ mlinkctl call down
+data call: down
+indication: data call down
+$ ping -c 3 -W 1 10.77.0.2  ->  3 packets transmitted, 0 received, 100% packet loss
+$ mlinkctl call up
+data call: up
+indication: data call up
+$ ping -c 3 10.77.0.2       ->  3 packets transmitted, 3 received, 0% packet loss
+$ mlinkctl bench 500
+ctrl GET_LINK_INFO n=500 min=237.7 p50=438.3 p90=569.6 p99=763.1 max=1205.9 us
+Zephyr serial: ctrl req/resp/inv/full=504/504/0/0 dcdrop=3   (3 pings dropped while the call was down)

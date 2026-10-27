@@ -18,6 +18,8 @@ struct modem_stats {
 	u32 to_stack, csum_fixed, tx_waits, tx_dropped;
 	u32 kicks_data, kicks_space, kicks_state;
 	u32 link_ups, link_resets;
+	u64 rx_bytes, tx_bytes;			/* data rings, for GET_STATS */
+	u32 ctrl_req, ctrl_resp, ctrl_invalid, ctrl_full, dc_dropped;
 };
 
 struct modem {
@@ -38,6 +40,7 @@ struct modem {
 
 	u32 own_id, peer_id;
 	bool hdr_ok, peer_found, link_up;
+	bool data_call;		/* SET_DATA_CALL from the AP; down = drop data traffic */
 	enum mlink_link_state state;
 	u32 gen, peer_gen, tx_seq;
 	bool rx_broken, tx_broken;
@@ -51,6 +54,9 @@ struct modem {
 extern struct modem m;
 
 void modem_kick(enum mlink_vector vec);
+
+/* ctrl.c: serve control requests from ring C, answer on ring D (poll thread). */
+void modem_ctrl_poll(void);
 
 #ifdef CONFIG_MLINK_MODEM_NET
 /* net.c: hand one validated packet (private copy) to the IP stack. */
