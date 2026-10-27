@@ -64,8 +64,8 @@
   unchanged since 2019); no GitLab issue or qemu-devel patch found.
   Evidence `bench/results/p10-ivshmem-client.txt`; repro/test
   `scripts/host/p10-ivshmem-client.sh repro|patch|build|functest|unpatch` (10.2.2 tree).
-- **The patch in `upstream/qemu-ivshmem-client-eof/` was written by Claude and must NOT be
-  submitted.** QEMU `docs/devel/code-provenance.rst`: the project declines contributions that
+- **The patch in `upstream/qemu-ivshmem-client-eof/` was written by User after Claude denied it and must be
+  submitted after acknowledging that bug was discovered by Claude.** QEMU `docs/devel/code-provenance.rst`: the project declines contributions that
   include or derive from AI-generated content (copyright/DCO reasons; Claude named explicitly).
   AI use for research, analysis and debugging is allowed if its output is not in the
   contribution. `qemu.org/contribute/report-a-bug`: bug reports found with AI tools are
@@ -73,17 +73,8 @@
   reproduced on the **latest upstream release**. No email/app password is needed for a report.
 - **Direction discussed with the user (not yet in plan.md):** (1) Claude re-verifies the bug on
   the latest QEMU release (signature-verified tarball, build only `ivshmem-client`, run
-  `repro`/`functest`); (2) the user files the GitLab issue themselves with the AI declaration
-  at the top; (3) optionally the user writes the fix **themselves** (their design: track
-  whether stdin is open, stop adding it to the `select()` set after EOF, keep serving the
-  server/peers, keep `maxfd` correct) and sends it to qemu-devel (Cc qemu-trivial; no
-  MAINTAINERS entry), noting AI-assisted discovery. Claude may explain, test and run checks,
-  but must not write or edit the report text or the fix. Points already given to the user for
-  their fix: distinct EOF return value, don't reuse `ret` (main() decides reconnect vs close on
-  it), where the flag lives across reconnects, `maxfd` starting at 0, no stray prompt on EOF,
-  justify "keep running vs exit on Ctrl-D".
-- The laptop QEMU master clone has a local commit by Claude with a placeholder author
-  ("Ankit (FULL NAME TBD)") — never send it.
+  `repro`/`functest`); (2) the GitLab issue is filed with the AI declaration
+  at the top; (3) claude use the fix written by user to help user file the issue
 
 ## Next
 1. Wait for the user to confirm the P10 direction → then update plan.md (P10 wording, D23) and
