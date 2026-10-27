@@ -266,7 +266,7 @@ static void ring_dump(struct seq_file *s, const char *name, struct mlink_ring *r
 	struct mlink_ring_ctrl *c = r->ctrl;
 
 	seq_printf(s, "%s: local_idx %u prod %u cons %u want_space %u want_kick %u\n",
-		   name, r->idx, READ_ONCE(c->prod.val), READ_ONCE(c->cons.val),
+		   name, READ_ONCE(r->idx), READ_ONCE(c->prod.val), READ_ONCE(c->cons.val),
 		   READ_ONCE(c->want_space.val), READ_ONCE(c->want_kick.val));
 }
 

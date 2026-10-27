@@ -6,9 +6,10 @@
 # one to /dev/kmsg at the start of each run).
 #
 # Usage (in a guest): bash /mnt/share/dmesg-gate.sh [marker]
-#   KCSAN_FILTER=1: on the KCSAN kernel, drop data-race reports that have no
-#   mlink frame (strict KCSAN reports races in core kernel code at boot and
-#   under load); they are counted, and any report touching mlink still fails.
+#   KCSAN_FILTER=1: on the KCSAN kernel, keep only data-race reports whose
+#   racing functions (the "data-race in A / B" header) include an mlink one.
+#   Strict KCSAN also reports races inside core code (qdisc, timekeeping,
+#   nohz), some reached through mlink calls; those are counted, not gated.
 set -uo pipefail
 
 MARK=${1:-}
@@ -21,15 +22,16 @@ else
 fi
 
 if [ "${KCSAN_FILTER:-0}" = 1 ]; then
-	# A report runs from "BUG: KCSAN" to the "=====" line; keep it only if it
-	# has an mlink frame (module tag or mlink_* symbol).
+	# A report runs from "BUG: KCSAN" to the "=====" line.
 	log=$(printf '%s\n' "$log" | awk '
-		/BUG: KCSAN/ { inb = 1; blk = ""; total++ }
-		inb { blk = blk $0 "\n"; if ($0 ~ /\[mlink\]|mlink_[a-z_0-9]+\+0x/) hit = 1
-		      if ($0 ~ /=====/) { if (hit) { printf "%s", blk; kept++ } inb = 0; hit = 0 }
+		/BUG: KCSAN/ { inb = 1; blk = ""; total++; own = ($0 ~ /\[mlink\]/); via = 0 }
+		inb { blk = blk $0 "\n"; if ($0 ~ /\[mlink\]/) via = 1
+		      if ($0 ~ /=====/) { if (own) { printf "%s", blk; kept++ } else if (via) viac++
+		                          inb = 0 }
 		      next }
 		{ print }
-		END { printf "KCSAN-FILTER: %d report(s), %d with mlink frames\n", total, kept > "/dev/stderr" }')
+		END { printf "KCSAN-FILTER: %d report(s): %d in mlink code, %d in core code reached via mlink, %d other\n",
+		      total, kept, viac, total - kept - viac > "/dev/stderr" }')
 fi
 
 hits=$(printf '%s' "$log" | grep -E "$PAT")

@@ -1,0 +1,211 @@
+# P5.4 KCSAN 1-h soak #1 (before the r->idx marking fix) — 6.18.59-mlink-kcsan, turbo off
+# command (laptop, tmux): KCSAN_FILTER=1 bash ~/D/mlink/scripts/host/thermal-run.sh bash ~/D/mlink/scripts/host/soak-long.sh 3600
+# RESULT: soak healthy; KCSAN found 5 races in mlink code (all on ring.idx: owner write vs link-work watchdog read), fixed by WRITE_ONCE/READ_ONCE
+2026-10-27T17:48:52+05:30 start pgid=2104022 hot=88 cool=78 temp=47C: bash /home/ankit-kali/D/mlink/scripts/host/soak-long.sh 3600
+=== long soak start 2026-10-27T17:48:57+05:30 dur=3600s temp=45C
+17:51:07 chaos burst 1 done
+17:53:30 modem restart 1 done
+17:56:20 chaos burst 2 done
+17:58:33 modem restart 2 done
+18:01:33 chaos burst 3 done
+18:03:36 modem restart 3 done
+18:06:46 chaos burst 4 done
+18:08:38 modem restart 4 done
+18:11:59 chaos burst 5 done
+18:13:41 modem restart 5 done
+18:17:11 chaos burst 6 done
+18:18:45 modem restart 6 done
+18:22:25 chaos burst 7 done
+18:23:48 modem restart 7 done
+18:27:38 chaos burst 8 done
+18:28:51 modem restart 8 done
+18:32:51 chaos burst 9 done
+18:33:54 modem restart 9 done
+18:38:05 chaos burst 10 done
+18:38:57 modem restart 10 done
+18:43:18 chaos burst 11 done
+18:44:01 modem restart 11 done
+18:48:31 chaos burst 12 done
+=== tcp
+=== ping
+61763 packets transmitted, 61227 received, 0.867833% packet loss, time 3599969ms
+rtt min/avg/max/mdev = 0.175/26.960/403.328/23.939 ms, pipe 8
+=== ap
+state: UP
+link_ups: 559
+link_resets: 558 (hb_timeout 0, peer_gen 258, peer_down 137, ring 163)
+ rx_len_errors: 92  rx_proto_errors: 3  rx_stalls: 11  ring_corruptions: 163  hb_saved_by_ring: 2269  hdr_repairs: 140  tx_stalls: 33  rx_csum_errors: 0
+bash: line 1: /sys/kernel/debug/kmemleak: Permission denied
+bash: line 1: /sys/kernel/debug/kmemleak: Permission denied
+grep: /sys/kernel/debug/kmemleak: No such file or directory
+kmemleak reports:
+KCSAN-FILTER: 70 report(s), 61 with mlink frames
+DMESG GATE: FAIL (mlink-ap)
+[ 3708.445343] BUG: KCSAN: data-race in ktime_get_seconds / timekeeping_update_from_shadow.constprop.0
+[ 3725.874180] BUG: KCSAN: data-race in ktime_get_seconds / timekeeping_update_from_shadow.constprop.0
+[ 3734.497714] BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+[ 3740.288923] BUG: KCSAN: data-race in ktime_get_seconds / timekeeping_update_from_shadow.constprop.0
+[ 3750.994876] BUG: KCSAN: data-race in netif_tx_wake_queue / qdisc_maybe_clear_missed
+[ 3758.933032] BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+[ 3828.896970] BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+[ 3841.275367] BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+[ 3846.041300] BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+[ 3852.499704] BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+[ 3871.241627] BUG: KCSAN: data-race in tick_nohz_handler / tick_nohz_idle_got_tick
+[ 3875.385038] BUG: KCSAN: data-race in ktime_get_seconds / timekeeping_update_from_shadow.constprop.0
+[ 3883.315657] BUG: KCSAN: data-race in netif_tx_wake_queue / qdisc_maybe_clear_missed
+[ 3893.326577] BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+[ 3897.458917] BUG: KCSAN: data-race in netif_tx_wake_queue / qdisc_maybe_clear_missed
+[ 3901.746191] BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+[ 3923.080942] BUG: KCSAN: data-race in netif_tx_wake_queue / qdisc_maybe_clear_missed
+[ 3923.376693] BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+[ 3929.094546] BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+[ 3946.857070] BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+[ 3954.493774] BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+[ 3961.289041] BUG: KCSAN: data-race in netif_tx_wake_queue / qdisc_maybe_clear_missed
+[ 3969.270374] BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+[ 3989.713142] BUG: KCSAN: data-race in netif_tx_wake_queue / qdisc_maybe_clear_missed
+[ 3999.200650] BUG: KCSAN: data-race in netif_tx_wake_queue / qdisc_maybe_clear_missed
+[ 4008.335104] BUG: KCSAN: data-race in netif_tx_wake_queue / qdisc_maybe_clear_missed
+[ 4022.125059] BUG: KCSAN: data-race in mlink_ring_consume [mlink] / mlink_ring_pending [mlink]
+[ 4023.290318] BUG: KCSAN: data-race in netif_tx_wake_queue / qdisc_maybe_clear_missed
+[ 4025.734878] BUG: KCSAN: data-race in ktime_get_seconds / timekeeping_update_from_shadow.constprop.0
+[ 4043.219264] BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+[ 4066.643755] BUG: KCSAN: data-race in netif_tx_wake_queue / qdisc_maybe_clear_missed
+[ 4070.817465] BUG: KCSAN: data-race in netif_tx_wake_queue / qdisc_maybe_clear_missed
+[ 4080.382613] BUG: KCSAN: data-race in mlink_ring_consume [mlink] / mlink_ring_pending [mlink]
+[ 4086.737042] BUG: KCSAN: data-race in netif_tx_wake_queue / qdisc_maybe_clear_missed
+[ 4092.357325] BUG: KCSAN: data-race in netif_tx_wake_queue / qdisc_maybe_clear_missed
+[ 4148.086819] BUG: KCSAN: data-race in netif_tx_wake_queue / qdisc_maybe_clear_missed
+[ 4151.525429] BUG: KCSAN: data-race in netif_tx_wake_queue / qdisc_maybe_clear_missed
+[ 4182.021475] BUG: KCSAN: data-race in netif_tx_wake_queue / qdisc_maybe_clear_missed
+[ 4186.420744] BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+[ 4206.460553] BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+=== modem
+state: UP
+link_ups: 59
+link_resets: 58 (hb_timeout 0, peer_gen 32, peer_down 9, ring 17)
+ rx_len_errors: 14  rx_proto_errors: 0  rx_stalls: 0  ring_corruptions: 17  hb_saved_by_ring: 220  hdr_repairs: 0  tx_stalls: 2  rx_csum_errors: 0
+bash: line 1: /sys/kernel/debug/kmemleak: Permission denied
+bash: line 1: /sys/kernel/debug/kmemleak: Permission denied
+grep: /sys/kernel/debug/kmemleak: No such file or directory
+kmemleak reports:
+KCSAN-FILTER: 70 report(s), 58 with mlink frames
+DMESG GATE: FAIL (mlink-modem)
+[ 3727.739544] BUG: KCSAN: data-race in netif_tx_wake_queue / qdisc_maybe_clear_missed
+[ 3728.415192] BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+[ 3731.555309] BUG: KCSAN: data-race in netif_tx_wake_queue / qdisc_maybe_clear_missed
+[ 3741.037496] BUG: KCSAN: data-race in netif_tx_wake_queue / qdisc_maybe_clear_missed
+[ 3742.938401] BUG: KCSAN: data-race in ktime_get_seconds / timekeeping_update_from_shadow.constprop.0
+[ 3752.324476] BUG: KCSAN: data-race in netif_tx_wake_queue / qdisc_maybe_clear_missed
+[ 3777.883028] BUG: KCSAN: data-race in ktime_get_seconds / timekeeping_update_from_shadow.constprop.0
+[ 3786.347653] BUG: KCSAN: data-race in netif_tx_wake_queue / qdisc_maybe_clear_missed
+[ 3802.018940] BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+[ 3807.388556] BUG: KCSAN: data-race in netif_tx_wake_queue / qdisc_maybe_clear_missed
+[ 3812.459756] BUG: KCSAN: data-race in netif_tx_wake_queue / qdisc_maybe_clear_missed
+[ 3823.829891] BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+[ 3828.350461] BUG: KCSAN: data-race in ktime_get_seconds / timekeeping_update_from_shadow.constprop.0
+[ 3867.141254] BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+[ 3872.916066] BUG: KCSAN: data-race in mlink_link_work [mlink] / mlink_ring_consume [mlink]
+[ 3895.974694] BUG: KCSAN: data-race in netif_tx_wake_queue / qdisc_maybe_clear_missed
+[ 3900.949386] BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+[ 3909.716262] BUG: KCSAN: data-race in mlink_ring_consume [mlink] / mlink_ring_pending [mlink]
+[ 3921.010750] BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+[ 3935.948992] BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+[ 3944.319867] BUG: KCSAN: data-race in ktime_get_seconds / timekeeping_update_from_shadow.constprop.0
+[ 3948.297245] BUG: KCSAN: data-race in netif_tx_wake_queue / qdisc_maybe_clear_missed
+[ 3949.491625] BUG: KCSAN: data-race in ktime_get_seconds / timekeeping_update_from_shadow.constprop.0
+[ 3980.127073] BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+[ 3988.858592] BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+[ 4001.563350] BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+[ 4004.682198] BUG: KCSAN: data-race in ktime_get_seconds / timekeeping_update_from_shadow.constprop.0
+[ 4011.347564] BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+[ 4023.215286] BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+[ 4029.608726] BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+[ 4033.958713] BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+[ 4042.776081] BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+[ 4063.117372] BUG: KCSAN: data-race in ktime_get_seconds / timekeeping_update_from_shadow.constprop.0
+[ 4065.668093] BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+[ 4081.079144] BUG: KCSAN: data-race in ktime_get_seconds / timekeeping_update_from_shadow.constprop.0
+[ 4140.271311] BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+[ 4144.583604] BUG: KCSAN: data-race in mlink_ring_consume [mlink] / mlink_ring_pending [mlink]
+[ 4170.586258] BUG: KCSAN: data-race in netif_tx_wake_queue / qdisc_maybe_clear_missed
+[ 4176.326248] BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+[ 4180.402570] BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+=== long soak end 2026-10-27T18:49:19+05:30 chaos_bursts=12 modem_restarts=11 max_temp=64C aborted=0
+2026-10-27T18:49:19+05:30 end rc=0, frozen for 0s total, temp=53C
+EXIT=0
+## race pairs on ap (dmesg)
+     26 BUG: KCSAN: data-race in netif_tx_wake_queue / qdisc_maybe_clear_missed
+     22 BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+     13 BUG: KCSAN: data-race in ktime_get_seconds / timekeeping_update_from_shadow.constprop.0
+      6 BUG: KCSAN: data-race in tick_nohz_handler / tick_nohz_idle_got_tick
+      2 BUG: KCSAN: data-race in mlink_ring_consume [mlink] / mlink_ring_pending [mlink]
+      1 BUG: KCSAN: data-race in pfifo_fast_dequeue / pfifo_fast_enqueue
+## first mlink-code report on ap
+[ 4022.125059] BUG: KCSAN: data-race in mlink_ring_consume [mlink] / mlink_ring_pending [mlink]
+
+[ 4022.129539] read to 0xffff8880079258cc of 4 bytes by task 1179 on cpu 1:
+[ 4022.132253]  mlink_ring_pending+0x37/0x50 [mlink]
+[ 4022.134358]  mlink_link_work+0x952/0xc70 [mlink]
+[ 4022.136338]  process_one_work+0x329/0x6b0
+[ 4022.138060]  worker_thread+0x2f4/0x590
+[ 4022.139697]  kthread+0x1c0/0x340
+[ 4022.141075]  ret_from_fork+0x147/0x160
+[ 4022.142728]  ret_from_fork_asm+0x1a/0x30
+
+[ 4022.145079] write to 0xffff8880079258cc of 4 bytes by interrupt on cpu 0:
+[ 4022.147896]  mlink_ring_consume+0x32/0x50 [mlink]
+[ 4022.149959]  mlink_rx_poll+0xc4/0x530 [mlink]
+[ 4022.151939]  mlink_napi_poll+0x5a/0x1b0 [mlink]
+[ 4022.153942]  __napi_poll+0x6e/0x2a0
+[ 4022.155528]  net_rx_action+0x617/0x700
+[ 4022.157076]  handle_softirqs+0xc8/0x270
+[ 4022.158755]  do_softirq+0x42/0x60
+[ 4022.160159]  __local_bh_enable_ip+0x62/0x70
+[ 4022.161925]  _raw_spin_unlock_bh+0x3b/0x50
+[ 4022.163688]  lock_sock_nested+0x62/0x80
+[ 4022.165291]  raw_sendmsg+0x8ac/0x1950
+[ 4022.167120]  inet_sendmsg+0xac/0xb0
+[ 4022.168843]  __sys_sendto+0x2c5/0x2e0
+[ 4022.170581]  __x64_sys_sendto+0x80/0xa0
+[ 4022.172310]  x64_sys_call+0x1a0f/0x24e0
+[ 4022.174072]  do_syscall_64+0xa6/0x2b0
+## race pairs on modem (dmesg)
+     28 BUG: KCSAN: data-race in __qdisc_run / netif_tx_wake_queue
+     17 BUG: KCSAN: data-race in netif_tx_wake_queue / qdisc_maybe_clear_missed
+     15 BUG: KCSAN: data-race in ktime_get_seconds / timekeeping_update_from_shadow.constprop.0
+      4 BUG: KCSAN: data-race in tick_nohz_handler / tick_nohz_idle_got_tick
+      2 BUG: KCSAN: data-race in pfifo_fast_dequeue / pfifo_fast_enqueue
+      2 BUG: KCSAN: data-race in mlink_ring_consume [mlink] / mlink_ring_pending [mlink]
+      1 BUG: KCSAN: data-race in mlink_link_work [mlink] / mlink_ring_consume [mlink]
+      1 BUG: KCSAN: data-race in __dev_queue_xmit / __dev_queue_xmit
+## first mlink-code report on modem
+[ 3909.716262] BUG: KCSAN: data-race in mlink_ring_consume [mlink] / mlink_ring_pending [mlink]
+
+[ 3909.721101] write to 0xffff8880092d60cc of 4 bytes by interrupt on cpu 0:
+[ 3909.724200]  mlink_ring_consume+0x32/0x50 [mlink]
+[ 3909.726483]  mlink_rx_poll+0xc4/0x530 [mlink]
+[ 3909.728610]  mlink_napi_poll+0x5a/0x1b0 [mlink]
+[ 3909.730835]  __napi_poll+0x6e/0x2a0
+[ 3909.732432]  net_rx_action+0x617/0x700
+[ 3909.734219]  handle_softirqs+0xc8/0x270
+[ 3909.736056]  do_softirq+0x42/0x60
+[ 3909.737658]  __local_bh_enable_ip+0x62/0x70
+[ 3909.739621]  _raw_spin_unlock_bh+0x3b/0x50
+[ 3909.741499]  __release_sock+0x8f/0x190
+[ 3909.743272]  release_sock+0x49/0xf0
+[ 3909.744985]  tcp_recvmsg+0xb9/0x2e0
+[ 3909.746724]  inet6_recvmsg+0x7b/0x190
+[ 3909.748408]  sock_recvmsg+0x9d/0x100
+[ 3909.750162]  sock_read_iter+0x12f/0x1d0
+[ 3909.752004]  vfs_read+0x5a7/0x5e0
+[ 3909.753591]  ksys_read+0x125/0x150
+[ 3909.755210]  __x64_sys_read+0x4b/0x60
+[ 3909.756973]  x64_sys_call+0x237f/0x24e0
+[ 3909.758814]  do_syscall_64+0xa6/0x2b0
+[ 3909.760560]  entry_SYSCALL_64_after_hwframe+0x77/0x7f
+
+[ 3909.763733] read to 0xffff8880092d60cc of 4 bytes by task 42 on cpu 1:
+[ 3909.766724]  mlink_ring_pending+0x37/0x50 [mlink]
+[ 3909.769008]  mlink_link_work+0x952/0xc70 [mlink]

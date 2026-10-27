@@ -90,8 +90,10 @@ static void mlink_link_reset(struct mlink_dev *mdev, enum mlink_reset_reason why
 	if (why == MLINK_RESET_RING)
 		dev_info(&mdev->pdev->dev,
 			 "ring error: tx_broken=%d idx=%u peer_cons=%u | rx_broken=%d idx=%u peer_prod=%u | peer gen=%u acked=%u\n",
-			 READ_ONCE(mdev->tx_broken), mdev->tx.idx, mdev->tx.seen,
-			 READ_ONCE(mdev->rx_broken), mdev->rx.idx, mdev->rx.seen,
+			 READ_ONCE(mdev->tx_broken), READ_ONCE(mdev->tx.idx),
+			 READ_ONCE(mdev->tx.seen),
+			 READ_ONCE(mdev->rx_broken), READ_ONCE(mdev->rx.idx),
+			 READ_ONCE(mdev->rx.seen),
 			 READ_ONCE(mdev->peer->gen), mdev->peer_gen);
 	trace_mlink_link(mdev->link_state, MLINK_ST_WAIT_PEER, why);
 
@@ -163,6 +165,8 @@ void mlink_link_stop(struct mlink_dev *mdev)
 /* Lost-DATA-kick watchdog; see phase2 walkthrough §7. */
 static void mlink_link_rx_watchdog(struct mlink_dev *mdev)
 {
+	u32 idx = READ_ONCE(mdev->rx.idx);	/* NAPI's index, read locklessly */
+
 	/*
 	 * Decide on local facts only: data pending and our consumer index has
 	 * not moved for two polls. Do NOT require want_kick == 1: that flag
@@ -170,8 +174,8 @@ static void mlink_link_rx_watchdog(struct mlink_dev *mdev)
 	 * so the producer stopped kicking and the old check never fired.
 	 */
 	if (mlink_ring_pending(&mdev->rx) &&
-	    (!mdev->rx_stall_seen || mdev->rx.idx == mdev->rx_stall_idx)) {
-		mdev->rx_stall_idx = mdev->rx.idx;
+	    (!mdev->rx_stall_seen || idx == mdev->rx_stall_idx)) {
+		mdev->rx_stall_idx = idx;
 		if (++mdev->rx_stall_seen >= 2) {
 			mdev->stats.rx_stalls++;
 			mdev->rx_stall_seen = 0;

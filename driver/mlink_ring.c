@@ -32,10 +32,16 @@ void mlink_ring_attach(struct mlink_ring *r, void *base, u32 entries, u32 slot_s
 	r->idx = 0;	/* the link state machine resets the shared fields */
 }
 
+/*
+ * r->idx is written only by the owning data path, but the link work reads it
+ * locklessly for its watchdogs: owner writes are WRITE_ONCE, foreign reads
+ * READ_ONCE (KCSAN, P5.4).
+ */
+
 /* Zero the producer-owned fields (link reset, data path quiesced). */
 void mlink_ring_reset_producer(struct mlink_ring *r)
 {
-	r->idx = 0;
+	WRITE_ONCE(r->idx, 0);
 	WRITE_ONCE(r->ctrl->want_space.val, 0);
 	WRITE_ONCE(r->ctrl->prod.val, 0);
 }
@@ -43,7 +49,7 @@ void mlink_ring_reset_producer(struct mlink_ring *r)
 /* Zero the consumer-owned fields (link reset, data path quiesced). */
 void mlink_ring_reset_consumer(struct mlink_ring *r)
 {
-	r->idx = 0;
+	WRITE_ONCE(r->idx, 0);
 	WRITE_ONCE(r->ctrl->want_kick.val, 0);
 	WRITE_ONCE(r->ctrl->cons.val, 0);
 }
@@ -55,10 +61,10 @@ int mlink_ring_free(struct mlink_ring *r)
 {
 	/* Acquire: the consumer finished reading a slot before we refill it. */
 	u32 cons = virt_load_acquire(&r->ctrl->cons.val);
-	u32 used = r->idx - cons;	/* unsigned wrap-around is intended */
+	u32 used = READ_ONCE(r->idx) - cons;	/* unsigned wrap-around is intended */
 
 	if (unlikely(used > r->entries)) {
-		r->seen = cons;
+		WRITE_ONCE(r->seen, cons);	/* diagnostics; may race with the watchdog */
 		return -EIO;
 	}
 	return r->entries - used;
@@ -80,7 +86,7 @@ void mlink_ring_publish(struct mlink_ring *r, u32 len, const struct mlink_tx_met
 	WRITE_ONCE(d->seq, seq);
 	WRITE_ONCE(d->csum_start, m->csum_start);
 	WRITE_ONCE(d->csum_offset, m->csum_offset);
-	r->idx++;
+	WRITE_ONCE(r->idx, r->idx + 1);
 	/* Release: payload and descriptor become visible no later than prod. */
 	virt_store_release(&r->ctrl->prod.val, r->idx);
 }
@@ -125,7 +131,7 @@ int mlink_ring_peek(struct mlink_ring *r, struct mlink_rx_desc *d)
 	if (!avail)
 		return 0;
 	if (unlikely(avail > r->entries)) {
-		r->seen = prod;
+		WRITE_ONCE(r->seen, prod);
 		return -EIO;
 	}
 
@@ -145,7 +151,7 @@ int mlink_ring_peek(struct mlink_ring *r, struct mlink_rx_desc *d)
 
 void mlink_ring_consume(struct mlink_ring *r)
 {
-	r->idx++;
+	WRITE_ONCE(r->idx, r->idx + 1);
 }
 
 /* Publish everything consumed so far (batched: one shared store per poll). */
@@ -179,5 +185,5 @@ void mlink_ring_disarm_kick(struct mlink_ring *r)
 
 u32 mlink_ring_pending(struct mlink_ring *r)
 {
-	return READ_ONCE(r->ctrl->prod.val) - r->idx;
+	return READ_ONCE(r->ctrl->prod.val) - READ_ONCE(r->idx);
 }

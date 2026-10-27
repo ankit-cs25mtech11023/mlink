@@ -58,7 +58,7 @@ for vm in modem ap; do
 	g "$vm" "bash /mnt/share/mlink-down.sh" >/dev/null || { echo "unload $vm: FAIL"; fail=1; }
 done
 for vm in ap modem; do
-	g "$vm" "bash /mnt/share/dmesg-gate.sh $MARK" || fail=1
+	g "$vm" "KCSAN_FILTER=${KCSAN_FILTER:-0} bash /mnt/share/dmesg-gate.sh $MARK" || fail=1
 done
 
 if [ $fail -eq 0 ]; then echo "TEST: PASS"; else echo "TEST: FAIL"; exit 1; fi

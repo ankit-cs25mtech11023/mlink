@@ -158,6 +158,30 @@ Format: symptom → hypotheses → evidence → root cause → fix → lesson. N
   ticked box notes the one failure. Candidate hardening if it recurs: mask the DATA MSI-X vector
   locally while NAPI polls (as NICs mask in hardware) so the peer cannot drive our IRQ rate.
 
+## 2026-10-27 — P5.4: KCSAN data race on the ring's local index
+
+- **Symptom:** 1-h soak on the KCSAN kernel (`bench/results/kcsan/p5-soak-long-kcsan-1.txt`):
+  soak healthy, but 5 reports with mlink on *both* sides of the race:
+  `mlink_ring_consume / mlink_ring_pending` (4) and `mlink_link_work / mlink_ring_consume` (1).
+- **Root cause:** each side keeps a local index `r->idx` that only its data path writes (NAPI
+  for RX, xmit for TX), but the link work's lost-kick/stall watchdogs read it locklessly from
+  process context (`mlink_ring_pending`, `mlink_ring_free` via the TX watchdog, the stall
+  check, the reset diagnostics), plus debugfs. Plain `r->idx++` vs plain load = a data race
+  under LKMM: harmless on x86 for an aligned u32 in practice, but the compiler is free to tear,
+  fuse or re-load plain accesses, and the reader's logic assumes one coherent value.
+- **Fix:** owner writes `WRITE_ONCE(r->idx, r->idx + 1)` (publish, consume, reset); foreign
+  reads `READ_ONCE` (free, pending, watchdog snapshot into a local, reset `dev_info`, debugfs
+  dump); `r->seen` diagnostics likewise. Owner-only reads stay plain. checkpatch --strict,
+  sparse, W=1 still clean; the Zephyr build gets the same change (shared `mlink_ring.c`).
+- **Gate:** strict KCSAN also reports races inside core code — `__qdisc_run /
+  netif_tx_wake_queue`, `netif_tx_wake_queue / qdisc_maybe_clear_missed` (reached from our
+  SPACE hardirq, a supported context for waking a queue), timekeeping, nohz, pfifo_fast. The
+  `KCSAN_FILTER=1` gate fails only on reports whose race header names an mlink function and
+  counts the rest. Re-run: `p5-soak-long-kcsan-2.txt`.
+- **Lesson:** "lockless by design" still needs the accesses *marked*; KCSAN found what the
+  LKMM litmus tests could not, because the litmus tests model the cross-VM protocol, not the
+  intra-kernel watchdog reads.
+
 ## 2026-10-27 — P9: control shell to the arm64 initramfs guest loses or delays commands
 
 - **Symptom:** commands sent to the arm64 guest's shell came back late (the output of call N
