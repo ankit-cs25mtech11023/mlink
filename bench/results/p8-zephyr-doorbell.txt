@@ -1,0 +1,31 @@
+# P8.1 Zephyr ivshmem-doorbell risk check — 2026-10-27, laptop (i5-8250U), TCG
+# Zephyr v4.4.2, SDK 1.0.1 (x86_64-zephyr-elf), board qemu_x86_64
+# Upstream sample samples/drivers/virtualization/ivshmem/doorbell + zephyr/p81-doorbell.conf
+# (stock board conf: 2 vectors, 8 KiB malloc arena -> "Could not allocate message buffer"
+#  against our 4 MiB region; first run failed exactly that way).
+
+$ bash ~/D/mlink/scripts/host/zephyr-p81.sh build
+Memory region         Used Size  Region Size  %age Used
+             RAM:       4776 KB        31 MB     15.05%
+          LOCORE:         20 KB        60 KB     33.33%
+   text	   data	    bss	    dec	    hex	filename
+ 171696	4334969	 399324	4905989	 4adc05	zephyr.elf      (data = 4.1 MiB malloc arena)
+
+$ du -sh ~/D/mlink-work/zephyr          # repo (shallow) + SDK + venv + builds
+1.3G
+
+# ivshmem-server -n 5 already serving the AP (peer 0) and modem (peer 1) Linux guests.
+$ bash ~/D/mlink/scripts/host/zephyr-p81.sh run 120      # in tmux
+$ ivshmem-client -S ~/D/mlink-work/run/ivshmem.sock  ->  dump
+our_id = 6 ; peers 0, 1, 5 (5 = Zephyr), each with vectors 0..4 enabled
+$ ivshmem-client ... -> "int 5 0", "int 5 3"
+
+# ~/D/mlink-work/logs/zephyr-serial.log
+*** Booting Zephyr OS build v4.4.2 ***
+Use write_shared_memory.sh and ivshmem-client to send a message
+received IRQ and full message: MLNK^C
+received IRQ and full message: MLNK^C
+
+# "MLNK" + 0x03 = mlink_shm_hdr.magic + abi_version 3 written by the AP driver:
+# Zephyr maps the same BAR2 region and takes MSI-X doorbells from our server.
+# Afterwards: scripts/win/test.sh PASS (AP<->modem link unaffected by the third peer).

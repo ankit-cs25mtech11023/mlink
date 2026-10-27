@@ -659,6 +659,11 @@ Every phase ends with: walkthrough doc → study gate → commit (+ push once re
 - P8.2 Zephyr app: same shm ABI (shared header copied), **loopback modem** (reflects IP packets
   with swapped src/dst + fixed-up checksums) — standard modem test mode.
 - P8.3 Then optionally real Zephyr IP stack via a Zephyr net driver on the ring.
+- P8.2 detail (D19): `zephyr/mlink-modem/` app (qemu_x86_64, TCG) takes the modem role; it
+  compiles `driver/mlink_ring.c` + `mlink_shm.h` **unchanged** through a small compat shim;
+  same state-block handshake/heartbeat as `mlink_link.c`; loopback = ICMP echo → reply,
+  UDP → swapped addresses and ports; control rings not served. Tests: ping, udp_pingpong,
+  iperf3-free (loopback), SSR both ways (kill Zephyr → AP detects; AP rmmod → Zephyr re-handshakes).
 
 ### Phase 9 — (stretch) aarch64 guest
 - P9.1 `qemu-system-aarch64` (needs package install by user), TCG (slow — functional only).
@@ -776,6 +781,20 @@ For each phase N:
   AP kernel assigns txn ids and routes RESP to the requesting file, IND broadcast; on SSR pending
   requests get a synthetic RESP with result ENOTCONN and readers see POLLHUP until UP again.
   Daemon `mlinkd` (modem) and CLI `mlinkctl` (AP) in tools/.
+- **D19 (2026-10-27)** P8.1 risk check passed: Zephyr **v4.4.2** + SDK 1.0.1 (x86_64 toolchain
+  only, workspace 1.3 GB in `~/D/mlink-work/zephyr`), board `qemu_x86_64` under TCG, upstream
+  `CONFIG_IVSHMEM_DOORBELL` driver with MSI-X. The stock doorbell sample, rebuilt with
+  `zephyr/p81-doorbell.conf` (5 vectors, 4 MiB malloc arena), joined our ivshmem-server as a
+  third peer and received doorbells on vectors 0 and 3, reading our `MLNK` v3 header
+  (`bench/results/p8-zephyr-doorbell.txt`). P8.2 design: Zephyr app replaces the Linux modem
+  (modem VM stays booted with mlink unloaded); `driver/mlink_ring.c` compiled verbatim via a
+  compat shim (`READ_ONCE`/`WRITE_ONCE` → volatile, `virt_load_acquire`/`virt_store_release`
+  → `__atomic` acquire/release, `virt_*mb` → `__atomic_thread_fence(SEQ_CST)`); one thread
+  waits on five per-vector `k_poll_signal`s with a 50 ms timeout that also drives the
+  heartbeat/handshake; loopback rewrites ICMP echo request → reply (RFC 1624 incremental
+  checksum) and swaps UDP addresses + ports (a CHECKSUM_PARTIAL pseudo-header sum is
+  symmetric under the swap, so desc flags/csum fields are reflected as-is); anything else is
+  dropped and counted. Control rings (P7) are not served by Zephyr (AP requests time out).
 - **D14 (2026-10-27)** Guest kernel = **v6.18.59** (latest 6.18 longterm per kernel.org
   releases.json on 2026-10-27; 7.2.13 stable / 7.3 mainline not chosen — LTS for stable APIs).
   QEMU source 10.2.2, GPG signature verified (key CEACC9E15534EBABB82D3FA03353C9CEF108B584),
