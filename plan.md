@@ -670,9 +670,16 @@ Every phase ends with: walkthrough doc → study gate → commit (+ push once re
   `tools/tcp_check.py` (echo integrity + discard throughput), SSR with the stack.
 
 ### Phase 9 — (stretch) aarch64 guest
-- P9.1 `qemu-system-aarch64` (needs package install by user), TCG (slow — functional only).
+- P9.1 `qemu-system-aarch64`, TCG (slow — functional only). (D21: built from the verified
+  QEMU 10.2.2 source into `~/D/mlink-work`, no system packages.)
 - P9.2 Build same driver for arm64; run selftest + ping; discuss weak memory (x86 host TCG
   will not expose all reorderings — the litmus tests are the real evidence).
+- P9 detail (D21): arm64 guest = **modem** against the existing x86 KVM AP on the same
+  ivshmem-server (`-M virt,gic-version=3`, ITS for MSI-X); kernel 6.18.59 `allnoconfig` +
+  `configs/arm64-min.config` built with the kernel.org nolibc cross GCC; initramfs = static
+  busybox (arm64 .deb fetched non-root, verified by apt) + `mlink.ko` + `/init`; control via a
+  busybox shell listener reachable only on the laptop's loopback (user-net hostfwd). Tests: ring
+  selftest both ways, ping/UDP from the AP, SSR, insmod/rmmod loop.
 
 ### Phase 10 — (stretch) Upstream contribution
 - P10.1 Pick a real small issue found during this work (doc fix in ivshmem spec, a bug, a
@@ -808,6 +815,15 @@ For each phase N:
   threads → a `k_mutex` serialises producers (and the link reset); on a full ring the sender
   arms `want_space` and sleeps on a semaphore given by the SPACE vector, with the mutex
   released. Carrier follows the link state (`net_if_carrier_on/off`). IPv6 off.
+- **D21 (2026-10-27)** P9 without touching system packages: `apt-get -s` showed that
+  installing `qemu-system-arm` would upgrade the user's `qemu-system-x86` 10.2.2 → 11.1.0 (+5
+  packages) and `gcc-aarch64-linux-gnu` would upgrade system `binutils` and `linux-libc-dev` —
+  both forbidden (no upgrades). Instead: `qemu-system-aarch64` built from the already
+  GPG-verified QEMU 10.2.2 source (`--target-list=aarch64-softmmu`) into
+  `~/D/mlink-work/opt/qemu-aarch64`; kernel.org crosstool nolibc GCC (checksum-verified) in
+  `~/D/mlink-work/opt/`; busybox-static:arm64 via non-root `apt-get download` with a private
+  state dir (Kali archive signatures still checked). Minimal kernel config to keep the arm64
+  build in minutes; the arm64 guest is the modem peer of the x86 AP.
 - **D14 (2026-10-27)** Guest kernel = **v6.18.59** (latest 6.18 longterm per kernel.org
   releases.json on 2026-10-27; 7.2.13 stable / 7.3 mainline not chosen — LTS for stable APIs).
   QEMU source 10.2.2, GPG signature verified (key CEACC9E15534EBABB82D3FA03353C9CEF108B584),

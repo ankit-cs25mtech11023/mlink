@@ -100,8 +100,8 @@
 - [x] P8.3 (optional) Zephyr net driver on the ring with real Zephyr IP stack (D20: DUMMY_L2 iface, UDP/TCP echo + discard, tcp_check.py, SSR)
 
 ## Phase 9: (stretch) aarch64 guest
-- [ ] P9.1 Install/run qemu-system-aarch64 (TCG) guest with arm64 kernel
-- [ ] P9.2 Build and run driver on arm64 (selftest + ping) and write weak-memory discussion
+- [ ] P9.1 Install/run qemu-system-aarch64 (TCG) guest with arm64 kernel (D21: QEMU from verified source, kernel.org cross GCC, busybox initramfs; no system packages)
+- [ ] P9.2 Build and run driver on arm64 as the modem of the x86 AP (selftest + ping + SSR) and write weak-memory discussion
 
 ## Phase 10: (stretch) Upstream contribution
 - [ ] P10.1 Prepare and send one small upstream patch (submitting-patches flow, get_maintainer, send-email)
